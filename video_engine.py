@@ -11,7 +11,7 @@ from config import (
     VIDEO_WIDTH, VIDEO_HEIGHT, FPS, USE_NVENC, FFMPEG_THREADS
 )
 from database import get_connection, save_video_record
-from stickman_engine import render_stickman_frame
+from cinematic_engine import render_cinematic_frame
 from sound_generator import generate_all_audio_assets
 
 FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
@@ -160,7 +160,7 @@ def render_history_short(script_id: int) -> str:
     try:
         for f_idx in range(total_frames):
             cur_t = f_idx / RENDER_FPS
-            frame_img = render_stickman_frame(cur_t, duration, topic_title)
+            frame_img = render_cinematic_frame(cur_t, duration, topic_title)
             proc.stdin.write(frame_img.tobytes())
 
             if f_idx % 150 == 0:
