@@ -10,7 +10,6 @@ from database import init_db, get_connection
 from scraper import harvest_and_store_topics
 from script_generator import process_next_script
 from audio_engine import process_audio_for_script
-from blender_engine import render_3d_history_short
 from video_engine import render_history_short
 from youtube_uploader import upload_short_to_youtube
 
@@ -71,8 +70,8 @@ def run_production_batch(batch_size: int = 10, spacing_hours: int = 4):
             # Step B: Voiceover & Whisper Sync
             audio_info = process_audio_for_script(script_id)
 
-            # Step C: RTX 3060 Blender 4.2 3D Explainer Video Render
-            video_path = render_3d_history_short(script_id)
+            # Step C: RTX 3060 NVENC 2D Animated Stickman Render
+            video_path = render_history_short(script_id)
 
             # Fetch script details for YouTube metadata
             conn = get_connection()
