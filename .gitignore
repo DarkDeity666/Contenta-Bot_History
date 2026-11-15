@@ -1,0 +1,75 @@
+# ========================================================
+# ANTIGRAVITY HISTORY BOT - GITIGNORE (ZERO-LEAK SECURITY)
+# ========================================================
+
+# --- 1. SENSITIVE CREDENTIALS & API KEYS (CRITICAL: DO NOT COMMIT) ---
+.env
+.env.local
+.env.*.local
+client_secret*.json
+youtube_token.json
+token.json
+credentials.json
+*.pem
+*.key
+*.p12
+
+# --- 2. PYTHON VIRTUAL ENVIRONMENTS ---
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- 3. PYTHON CACHES & COMPILED BYTECODE ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- 4. LOCAL DATABASES & CACHED DATA ---
+history_vault.db
+*.db
+*.sqlite
+*.sqlite3
+
+# --- 5. LOGS & DIAGNOSTICS ---
+*.log
+ffmpeg_render.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- 6. HEAVY GENERATED OUTPUTS (Keep folder, ignore media files) ---
+output/*
+!output/.gitkeep
+
+# Temporary downloaded historical image caches
+assets/images/historical_*
+
+# --- 7. OPERATING SYSTEM & IDE ARTIFACTS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+.idea/
+.vscode/
+*.swp
+*.swo
