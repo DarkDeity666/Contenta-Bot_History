@@ -329,10 +329,16 @@ def draw_cinematic_stickman(
         # Striped Prisoner Beanie
         draw.chord([sx_head - head_r - 2, sy_head - head_r - cam.scale_len(10), sx_head + head_r + 2, sy_head - cam.scale_len(4)], 180, 360, fill=(245, 245, 250), outline=PALETTE["stick_black"], width=outline_w)
         draw.line([(sx_head - head_r + 4, sy_head - head_r // 2 - cam.scale_len(4)), (sx_head + head_r - 4, sy_head - head_r // 2 - cam.scale_len(4))], fill=PALETTE["stick_black"], width=cam.scale_len(6))
-    elif costume in ["soldier", "guard"]:
-        # Steel Military Helmet
-        draw.chord([sx_head - head_r - 6, sy_head - head_r - cam.scale_len(12), sx_head + head_r + 6, sy_head + cam.scale_len(4)], 180, 360, fill=(70, 85, 50), outline=PALETTE["stick_black"], width=outline_w)
-        draw.line([(sx_head - head_r - 10, sy_head + cam.scale_len(2)), (sx_head + head_r + 10, sy_head + cam.scale_len(2))], fill=(50, 60, 35), width=cam.scale_len(5))
+    elif costume in ["soldier", "guard", "ww1_british"]:
+        # British Brodie Helmet (Wide-brimmed steel dish)
+        draw.chord([sx_head - head_r - 14, sy_head - head_r - cam.scale_len(14), sx_head + head_r + 14, sy_head + cam.scale_len(6)], 180, 360, fill=(90, 85, 60), outline=PALETTE["stick_black"], width=outline_w)
+        draw.line([(sx_head - head_r - 18, sy_head + cam.scale_len(4)), (sx_head + head_r + 18, sy_head + cam.scale_len(4))], fill=(65, 60, 40), width=cam.scale_len(6))
+    elif costume == "ww1_german":
+        # WWI German Feldmütze Cap with red cockade & head bandage
+        draw.chord([sx_head - head_r - 4, sy_head - head_r - cam.scale_len(12), sx_head + head_r + 4, sy_head + cam.scale_len(2)], 180, 360, fill=(75, 80, 85), outline=PALETTE["stick_black"], width=outline_w)
+        draw.line([(sx_head - head_r + 2, sy_head - head_r // 2), (sx_head + head_r - 2, sy_head - head_r // 2)], fill=(180, 45, 45), width=cam.scale_len(4))
+        # White wounded bandage across forehead
+        draw.line([(sx_head - head_r + 6, sy_head - cam.scale_len(10)), (sx_head + head_r - 6, sy_head - cam.scale_len(6))], fill=(240, 240, 245), width=cam.scale_len(8))
     elif costume == "pope":
         # Papal Mitre
         mitre_pts = [
@@ -618,6 +624,123 @@ def render_scene_beer_flood(draw: ImageDraw.ImageDraw, cam: Camera2D, t: float, 
         draw_cinematic_stickman(draw, cam, world_x=820, world_y=floor_wy - 150, costume="citizen", action="shock", facing=-1, scale=1.2, t=t)
 
 
+def render_scene_ww1_trenches(draw: ImageDraw.ImageDraw, cam: Camera2D, t: float, p: float):
+    """
+    STORY: The British Soldier Who Spared Adolf Hitler in 1918 (Henry Tandey at Marcoing)
+    - WWI mud trench parapet with stacked sandbags and wooden duckboards
+    - Barbed wire pickets, cratered battlefield, and burning artillery horizon
+    - Sniper crosshair overlay when aiming down sights
+    - Private Henry Tandey (British Brodie helmet, rifle) facing wounded German soldier
+    - In Beat 3/4: Fast forward to 1938 Berghof with the painting on the wall!
+    """
+    floor_wy = 1380.0
+
+    if p < 0.72:
+        # --- PHASE 1: WWI TRENCHES OF MARCOING (1918) ---
+        # 1. Burning Horizon & Smoky War Atmosphere
+        s_sky_top = cam.world_to_screen(-300, 200)
+        s_sky_bot = cam.world_to_screen(VIDEO_WIDTH + 300, floor_wy)
+        # Smoky orange artillery flash
+        flash_intensity = int(abs(math.sin(t * 3.5)) * 40)
+        draw.rectangle([s_sky_top[0], s_sky_top[1], s_sky_bot[0], s_sky_bot[1]], fill=(40 + flash_intensity, 28 + flash_intensity // 2, 22))
+
+        # Distant battle craters and smoke plumes
+        for smk_idx in range(4):
+            smk_x = 180 + smk_idx * 260
+            smk_y = 520 - int((t * 25 + smk_idx * 40) % 180)
+            s_smk = cam.world_to_screen(smk_x, smk_y)
+            sr = cam.scale_len(35 + smk_idx * 10)
+            draw.ellipse([s_smk[0] - sr, s_smk[1] - sr, s_smk[0] + sr, s_smk[1] + sr], fill=(55, 48, 42, 120))
+
+        # 2. Barbed Wire Wooden Pickets & Tangled Wire
+        for px in [140, 420, 740, 1020]:
+            p0 = cam.world_to_screen(px, floor_wy - 380)
+            p1 = cam.world_to_screen(px, floor_wy - 80)
+            draw.line([p0, p1], fill=(50, 36, 24), width=max(2, cam.scale_len(8)))
+            # Wire diagonals
+            w0 = cam.world_to_screen(px - 140, floor_wy - 320)
+            w1 = cam.world_to_screen(px + 140, floor_wy - 180)
+            draw.line([w0, w1], fill=(45, 45, 50), width=max(1, cam.scale_len(3)))
+            w2 = cam.world_to_screen(px - 140, floor_wy - 180)
+            w3 = cam.world_to_screen(px + 140, floor_wy - 320)
+            draw.line([w2, w3], fill=(45, 45, 50), width=max(1, cam.scale_len(3)))
+
+        # 3. Mud Trench Parapet with Stacked Sandbags
+        for s_row in range(3):
+            bag_wy = floor_wy - 120 - s_row * 65
+            bag_w = 140
+            offset = (s_row % 2) * 70
+            for bx in range(-offset - 200, VIDEO_WIDTH + 300, bag_w):
+                bs0 = cam.world_to_screen(bx + 4, bag_wy + 4)
+                bs1 = cam.world_to_screen(bx + bag_w - 4, bag_wy + 60)
+                bag_col = (85 - s_row * 10, 75 - s_row * 8, 55 - s_row * 6)
+                draw.rounded_rectangle([bs0[0], bs0[1], bs1[0], bs1[1]], radius=cam.scale_len(12), fill=bag_col, outline=PALETTE["stick_black"], width=max(2, cam.scale_len(3)))
+
+        # Duckboard Trench Floor
+        s_fl_l = cam.world_to_screen(-300, floor_wy)
+        s_fl_r = cam.world_to_screen(VIDEO_WIDTH + 300, floor_wy)
+        draw.line([s_fl_l, s_fl_r], fill=PALETTE["stick_black"], width=max(3, cam.scale_len(8)))
+        s_fl_bot = cam.world_to_screen(0, floor_wy + 600)
+        draw.rectangle([s_fl_l[0], s_fl_l[1], s_fl_r[0], s_fl_bot[1]], fill=(32, 24, 18))
+
+        # 4. Animated Characters in Confrontation
+        if p < 0.35:
+            # Beat 1: Tandey aims rifle directly at the wounded German corporal
+            draw_cinematic_stickman(draw, cam, world_x=340, world_y=floor_wy - 80, costume="ww1_british", action="idle", facing=1, scale=1.35, t=t, prop="rifle")
+            draw_cinematic_stickman(draw, cam, world_x=820, world_y=floor_wy - 80, costume="ww1_german", action="walk", facing=-1, scale=1.2, t=t)
+
+            # Sniper Crosshair HUD Overlay in center
+            ch_sx, ch_sy = cam.world_to_screen(820, floor_wy - 260)
+            ch_r = cam.scale_len(95)
+            draw.ellipse([ch_sx - ch_r, ch_sy - ch_r, ch_sx + ch_r, ch_sy + ch_r], outline=PALETTE["crimson"], width=max(2, cam.scale_len(3)))
+            draw.line([(ch_sx - ch_r - 20, ch_sy), (ch_sx + ch_r + 20, ch_sy)], fill=PALETTE["crimson"], width=max(1, cam.scale_len(2)))
+            draw.line([(ch_sx, ch_sy - ch_r - 20), (ch_sx, ch_sy + ch_r + 20)], fill=PALETTE["crimson"], width=max(1, cam.scale_len(2)))
+            draw.text((ch_sx, ch_sy - ch_r - 25), "🎯 TARGET LOCKED", fill=PALETTE["crimson"], anchor="mm", font_size=max(14, cam.scale_len(24)))
+
+        elif p < 0.72:
+            # Beat 2 & 3: Tandey lowers his rifle in mercy. Wounded Hitler nods and limps into fog!
+            draw_cinematic_stickman(draw, cam, world_x=340, world_y=floor_wy - 80, costume="ww1_british", action="idle", facing=1, scale=1.35, t=t)
+            # German corporal retreats
+            retreat_x = 820 + (p - 0.35) * 450
+            draw_cinematic_stickman(draw, cam, world_x=retreat_x, world_y=floor_wy - 80, costume="ww1_german", action="walk", facing=1, scale=1.15, t=t)
+            
+            # Comic callout: "MERCY GIVEN"
+            txt_sx, txt_sy = cam.world_to_screen(580, floor_wy - 360)
+            draw.text((txt_sx, txt_sy), "🕊️ A MOMENT OF MERCY", fill=PALETTE["gold"], anchor="mm", font_size=max(18, cam.scale_len(36)))
+
+    else:
+        # --- PHASE 2: BERGHOF 1938 (THE PAINTING ON THE WALL) ---
+        # Luxurious wood-paneled Alpine retreat wall
+        s_w0 = cam.world_to_screen(-300, 200)
+        s_w1 = cam.world_to_screen(VIDEO_WIDTH + 300, floor_wy + 400)
+        draw.rectangle([s_w0[0], s_w0[1], s_w1[0], s_w1[1]], fill=(55, 38, 25))
+
+        # Framed Painting of Henry Tandey on the wall
+        frame_wx = VIDEO_WIDTH // 2
+        frame_wy = 680.0
+        s_p0 = cam.world_to_screen(frame_wx - 180, frame_wy - 220)
+        s_p1 = cam.world_to_screen(frame_wx + 180, frame_wy + 180)
+        # Gold Frame
+        draw.rectangle([s_p0[0] - 8, s_p0[1] - 8, s_p1[0] + 8, s_p1[1] + 8], fill=PALETTE["gold"], outline=PALETTE["stick_black"], width=max(2, cam.scale_len(4)))
+        # Canvas inside
+        draw.rectangle([s_p0[0], s_p0[1], s_p1[0], s_p1[1]], fill=(95, 110, 80))
+        # Mini portrait of Tandey in the frame
+        draw_cinematic_stickman(draw, cam, world_x=frame_wx, world_y=frame_wy + 120, costume="ww1_british", action="idle", facing=1, scale=0.8, t=t, prop="rifle")
+        
+        # Label below painting
+        lbl_sx, lbl_sy = cam.world_to_screen(frame_wx, frame_wy + 225)
+        draw.text((lbl_sx, lbl_sy), "PTE. HENRY TANDEY, VC", fill=PALETTE["gold"], anchor="mm", font_size=max(16, cam.scale_len(26)))
+
+        # Floor
+        s_fl_l = cam.world_to_screen(-300, floor_wy)
+        s_fl_r = cam.world_to_screen(VIDEO_WIDTH + 300, floor_wy)
+        draw.line([s_fl_l, s_fl_r], fill=PALETTE["stick_black"], width=max(3, cam.scale_len(8)))
+
+        # Characters: Hitler pointing at painting to Chamberlain
+        draw_cinematic_stickman(draw, cam, world_x=360, world_y=floor_wy, costume="soldier", action="shock", facing=1, scale=1.3, t=t)
+        draw_cinematic_stickman(draw, cam, world_x=760, world_y=floor_wy, costume="citizen", action="idle", facing=-1, scale=1.3, t=t)
+
+
 # ====================================================================
 # 4. MASTER 2D FRAME COMPOSITOR (ZERO 3D, 100% POLISHED STICKMAN)
 # ====================================================================
@@ -640,7 +763,10 @@ def render_master_stickman_frame(t: float, total_duration: float, topic_title: s
     cam = get_camera_shot(t, total_duration, topic_title)
 
     # 3. Render Appropriate Historical Scene
-    if any(k in title_lower for k in ["water", "wall", "prison", "prisoner", "escape", "soap", "tunnel"]):
+    if any(k in title_lower for k in ["hitler", "wwi", "wwii", "trench", "tandey", "soldier", "sniper", "marcoing"]):
+        render_scene_ww1_trenches(draw, cam, t, p)
+        category_label = "⚔️ THE MOMENT THAT CHANGED HISTORY"
+    elif any(k in title_lower for k in ["water", "wall", "prison", "prisoner", "escape", "soap", "tunnel"]):
         render_scene_prison_break(draw, cam, t, p)
         category_label = "🔓 THE IMPOSSIBLE ESCAPE"
     elif any(k in title_lower for k in ["beer", "flood", "london", "disaster", "molasses", "dam", "liquid"]):
