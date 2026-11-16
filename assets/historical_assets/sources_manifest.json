@@ -1,0 +1,56 @@
+[
+  {
+    "id": "tandey_portrait",
+    "filename": "tandey_portrait.jpg",
+    "title": "Private Henry Tandey VC, DCM, MM (Official Portrait)",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/d/da/Pte_Tandey_VC_DCM_MM.JPG",
+    "license": "Public Domain (Pre-1923 / Crown Copyright Expired)",
+    "institution": "British Imperial War Museum / Daily Sketch",
+    "historical_context": "Henry Tandey VC DCM MM in service uniform, the most decorated British private of WWI."
+  },
+  {
+    "id": "matania_painting",
+    "filename": "matania_painting.jpg",
+    "title": "Fortunino Matania - Menin Crossroads (Depicting Henry Tandey)",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/9/91/Menin_Crossroads_%28cropped%29.jpg",
+    "license": "Public Domain (1914 artwork, author died 1963)",
+    "institution": "Green Howards Regimental Museum / Imperial War Museum",
+    "historical_context": "The painting Adolf Hitler had a copy of hanging in his study at the Berghof in 1938."
+  },
+  {
+    "id": "hitler_ww1",
+    "filename": "hitler_ww1.jpg",
+    "title": "Adolf Hitler as a Corporal in the First World War (1914-1918)",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/e/e4/Bundesarchiv_Bild_146-1974-082-44%2C_Adolf_Hitler_im_Ersten_Weltkrieg.jpg",
+    "license": "Public Domain / CC-BY-SA 3.0 Germany (German Federal Archives)",
+    "institution": "Bundesarchiv (German Federal Archives), Bild 146-1974-082-44",
+    "historical_context": "Hitler during WWI as a dispatch runner for the 16th Bavarian Reserve Infantry Regiment."
+  },
+  {
+    "id": "chamberlain_hitler_1938",
+    "filename": "chamberlain_hitler_1938.jpg",
+    "title": "Neville Chamberlain and Adolf Hitler at the Berghof (September 1938)",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/a/a3/Bundesarchiv_Bild_183-H12478%2C_Obersalzberg%2C_M%C3%BCnchener_Abkommen%2C_Vorbereitung.jpg",
+    "license": "Public Domain / CC-BY-SA 3.0 Germany (German Federal Archives)",
+    "institution": "Bundesarchiv (German Federal Archives), Bild 183-H12478",
+    "historical_context": "Chamberlain visiting Hitler's Alpine retreat at Obersalzberg where Hitler discussed the Tandey painting."
+  },
+  {
+    "id": "western_front_map",
+    "filename": "western_front_map.jpg",
+    "title": "Western Front 1918 Allied Military Map",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/4/42/Western_front_1918_german.jpg",
+    "license": "Public Domain (US Military Academy / West Point Archives)",
+    "institution": "United States Military Academy Department of History",
+    "historical_context": "Operational map of northern France in 1918 showing Cambrai, Marcoing, and the Hindenburg Line."
+  },
+  {
+    "id": "chamberlain_newspaper",
+    "filename": "chamberlain_newspaper.jpg",
+    "title": "Daily Mirror Front Page (September 15, 1938) - Chamberlain Flies to Hitler",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/0/04/1938-09-15-Daily-Mirror-Chamberlain-flying-to-see-Hitler.jpg",
+    "license": "Public Domain (British Newspaper Archive, copyright expired)",
+    "institution": "The Daily Mirror (UK)",
+    "historical_context": "Archival front page reporting the historic flight to Munich/Berghof."
+  }
+]

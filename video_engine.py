@@ -12,6 +12,7 @@ from config import (
 )
 from database import get_connection, save_video_record
 from stickman_cinematic_engine import render_master_stickman_frame
+from documentary_engine import render_documentary_frame
 from sound_generator import generate_all_audio_assets
 
 FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
@@ -30,10 +31,9 @@ def format_ass_time(seconds: float) -> str:
 
 def generate_ass_subtitles(timestamps: List[Dict[str, Any]], ass_path: str, words_per_screen: int = 3):
     """
-    Creates dynamic kinetic subtitles positioned in the upper-safe area
-    so they never block the live animated stickman action on the floor!
+    Creates dynamic kinetic subtitles positioned in the lower-third safe zone (MarginV=390)
+    so they are easily readable on mobile devices without colliding with bottom UI or hero imagery!
     """
-    # MarginV=1450 positions captions in the upper-middle area
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {VIDEO_WIDTH}
@@ -42,7 +42,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Impact,72,&H00FFFFFF,&H0000FFFF,&H00101010,&HB0000000,-1,0,0,0,100,100,1,0,1,7,4,2,60,60,1480,1
+Style: Default,Impact,66,&H00FFFFFF,&H0000FFFF,&H00101010,&HB0000000,-1,0,0,0,100,100,1,0,1,6,3,2,60,60,390,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -53,7 +53,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         chunk = timestamps[i:i + words_per_screen]
         for active_idx, active_word in enumerate(chunk):
             w_start = active_word["start"]
-            w_end = active_word["end"]
+            # Bridge to next word start in chunk to eliminate micro-flicker
+            if active_idx < len(chunk) - 1:
+                w_end = chunk[active_idx + 1]["start"]
+            else:
+                w_end = active_word["end"]
             
             line_parts = []
             for j, w in enumerate(chunk):
@@ -74,13 +78,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         
     print(f"[+] Kinetic ASS subtitles generated at: {ass_path}")
 
-def render_history_short(script_id: int) -> str:
+def render_history_short(script_id: int, mode: str = "documentary") -> str:
     """
-    Renders a 100% LIVE 2D ANIMATED STICKMAN Short:
-    - Articulated moving characters (walking, running, panicking, talking, sword fighting, gavel slamming)
-    - 4 distinct animated story scenes (Hook, Incident, Courtroom Chaos, Climax)
+    Renders a broadcast-grade historical short (1080x1920 vertical):
+    - mode="documentary": 2.5D archival documentary engine with Ken Burns motion, authentic public-domain photos/maps, and HUD dossier overlays.
+    - mode="stickman": 2D animated stickman engine for courtroom/narrative drama.
     - Live frame-by-frame rendering piped directly into NVENC on RTX 3060
-    - Pure 100% original graphics (zero copyright, zero static photos)
+    - Pure 100% verified historical assets / public domain
     - Brian human storytelling voice + ambient audio ducking
     """
     generate_all_audio_assets()
@@ -156,11 +160,14 @@ def render_history_short(script_id: int) -> str:
     log_file = open(OUTPUT_DIR / "ffmpeg_render.log", "w")
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=log_file)
 
-    # Frame generation loop: renders animated stickman frames and streams to FFmpeg
+    # Frame generation loop: renders animated frames and streams to FFmpeg
     try:
         for f_idx in range(total_frames):
             cur_t = f_idx / RENDER_FPS
-            frame_img = render_master_stickman_frame(cur_t, duration, topic_title)
+            if mode == "documentary":
+                frame_img = render_documentary_frame(cur_t, duration)
+            else:
+                frame_img = render_master_stickman_frame(cur_t, duration, topic_title)
             proc.stdin.write(frame_img.tobytes())
 
             if f_idx % 150 == 0:
@@ -183,7 +190,8 @@ def render_history_short(script_id: int) -> str:
 
     render_time = time.time() - start_render
     fps_achieved = total_frames / render_time if render_time > 0 else 0
-    print(f"[+] LIVE 2D ANIMATED Stickman Short #{script_id} successfully rendered!")
+    engine_name = "2.5D Archival Documentary" if mode == "documentary" else "2D Animated Stickman"
+    print(f"[+] {engine_name} Short #{script_id} successfully rendered!")
     print(f"    Saved: {output_video_path}")
     print(f"    Speed: {fps_achieved:.1f} FPS (Rendered in {render_time:.2f}s on RTX 3060)")
     
@@ -191,4 +199,4 @@ def render_history_short(script_id: int) -> str:
     return output_video_path
 
 if __name__ == "__main__":
-    render_history_short(1)
+    render_history_short(5, mode="documentary")
