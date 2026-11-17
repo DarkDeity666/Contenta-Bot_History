@@ -145,6 +145,20 @@ async def api_generate_scripts(request):
 async def api_get_scripts(request):
     return web.json_response({"scripts": cached_scripts})
 
+def find_matching_script(filename: str) -> Optional[Dict[str, Any]]:
+    fn = filename.lower()
+    for s in cached_scripts:
+        sid = s.get("id", "").lower()
+        stitle = s.get("title", "").lower()
+        if sid and sid in fn:
+            return s
+        words = [w.lower() for w in stitle.split() if len(w) > 4]
+        if any(w in fn for w in words):
+            return s
+    if "triboulet" in fn:
+        return next((s for s in cached_scripts if "triboulet" in s.get("id", "").lower()), None)
+    return None
+
 # --- Video Vault APIs ---
 async def api_get_videos(request):
     videos = []
@@ -154,19 +168,35 @@ async def api_get_videos(request):
             size_mb = round(stat.st_size / (1024 * 1024), 2)
             name = file.name
             
-            # Format clean title
             clean_title = name.replace(".mp4", "").replace("_", " ").title()
-            if "Master" in clean_title:
-                clean_title = "⭐ " + clean_title
+            matched_script = find_matching_script(name)
+            
+            if matched_script:
+                story_title = matched_script.get("title", clean_title)
+                suggested_title = matched_script.get("suggested_title") or f"{story_title[:45]} #Shorts"
+                suggested_desc = matched_script.get("suggested_desc") or (
+                    f"{matched_script.get('hook', '')}\n\n"
+                    f"{matched_script.get('escalation', '')}\n\n"
+                    f"📚 Historical Citations: {matched_script.get('citations', 'Verified Archives')}\n\n"
+                    f"🔔 Subscribe for daily historical animations!\n\n"
+                    f"#History #Shorts #HistoricalFacts #DidYouKnow #UntoldHistory #Documentary"
+                )
+            else:
+                story_title = clean_title
+                suggested_title = f"{clean_title} #Shorts"
+                suggested_desc = f"The incredible true historical record of {clean_title}.\n\n#History #Shorts #Animation"
                 
+            if "master" in name.lower() or "triboulet" in name.lower():
+                story_title = "⭐ " + story_title
+
             videos.append({
                 "filename": name,
-                "title": clean_title,
+                "title": story_title,
                 "url": f"/media/{name}",
                 "size_mb": size_mb,
                 "duration_str": "1:56" if "triboulet" in name.lower() else "0:55",
-                "suggested_title": f"{clean_title} #Shorts",
-                "suggested_desc": f"The full animated story of {clean_title}.\n\nCreated with 2.5D Blender Engine.\n\n#History #Shorts #Animation"
+                "suggested_title": suggested_title,
+                "suggested_desc": suggested_desc
             })
             
     # Sort with master / latest first
@@ -182,14 +212,30 @@ async def api_youtube_status(request):
     has_token = token_path.exists()
     
     channel_info = None
+    is_authenticated = False
     if has_token:
         # Check channel info in executor
         loop = asyncio.get_event_loop()
         channel_info = await loop.run_in_executor(None, youtube_uploader.get_channel_details)
+        if channel_info:
+            is_authenticated = True
+        else:
+            try:
+                from google.oauth2.credentials import Credentials
+                creds = Credentials.from_authorized_user_file(str(token_path))
+                if creds and (creds.valid or creds.refresh_token):
+                    is_authenticated = True
+                    channel_info = {
+                        "title": "Connected YouTube Channel",
+                        "subscribers": "Ready",
+                        "videoCount": "Ready"
+                    }
+            except Exception:
+                pass
         
     return web.json_response({
         "has_secret": has_secret,
-        "authenticated": channel_info is not None,
+        "authenticated": is_authenticated,
         "channel": channel_info
     })
 
@@ -208,13 +254,34 @@ async def api_youtube_auth(request):
     if not secret_path.exists():
         return web.json_response({
             "success": False, 
-            "error": "client_secret.json not found. Please upload your OAuth Client ID JSON first."
+            "error": "client_secret.json not found."
         }, status=400)
         
+    try:
+        auth_url = youtube_uploader.get_auth_url()
+        loop = asyncio.get_event_loop()
+        # Start background listener in case localhost redirect catches it
+        asyncio.create_task(loop.run_in_executor(None, lambda: youtube_uploader.get_authenticated_service(interactive=True)))
+        return web.json_response({
+            "success": True, 
+            "auth_url": auth_url,
+            "message": "Google authentication link generated."
+        })
+    except Exception as e:
+        return web.json_response({"success": False, "error": str(e)}, status=500)
+
+async def api_youtube_exchange_code(request):
+    data = await request.json()
+    code = data.get("code", "").strip()
+    if not code:
+        return web.json_response({"success": False, "error": "No code provided"}, status=400)
     loop = asyncio.get_event_loop()
-    # Run auth flow in executor so it doesn't block the server
-    asyncio.create_task(loop.run_in_executor(None, youtube_uploader.get_authenticated_service))
-    return web.json_response({"success": True, "message": "Auth server started on port 54892. Check your browser to log in."})
+    ok = await loop.run_in_executor(None, lambda: youtube_uploader.exchange_code_for_token(code))
+    if ok:
+        channel_info = await loop.run_in_executor(None, youtube_uploader.get_channel_details)
+        return web.json_response({"success": True, "channel": channel_info})
+    else:
+        return web.json_response({"success": False, "error": "Code exchange failed"}, status=400)
 
 async def api_upload_execute(request):
     data = await request.json()
@@ -330,6 +397,8 @@ def create_app():
     app.router.add_get("/api/youtube/status", api_youtube_status)
     app.router.add_post("/api/youtube/save-secret", api_youtube_save_secret)
     app.router.add_post("/api/youtube/auth", api_youtube_auth)
+    app.router.add_get("/api/youtube/auth", api_youtube_auth)
+    app.router.add_post("/api/youtube/exchange_code", api_youtube_exchange_code)
     app.router.add_post("/api/upload/execute", api_upload_execute)
     app.router.add_post("/api/upload/batch", api_upload_batch)
     app.router.add_post("/api/videos/generate", api_render_generate)

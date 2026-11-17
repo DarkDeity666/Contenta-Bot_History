@@ -12,7 +12,10 @@ from google.oauth2.credentials import Credentials
 from config import YOUTUBE_CLIENT_SECRET_FILE, BASE_DIR, OAUTH_REDIRECT_PORT
 from database import get_connection
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.readonly"
+]
 TOKEN_FILE = BASE_DIR / "youtube_token.json"
 
 def get_authenticated_service(interactive: bool = True):
@@ -54,6 +57,35 @@ def get_authenticated_service(interactive: bool = True):
                 token.write(creds.to_json())
             
     return build("youtube", "v3", credentials=creds) if creds and creds.valid else None
+
+def get_auth_url():
+    """Generates direct Google OAuth login URL for Desktop Client."""
+    flow = InstalledAppFlow.from_client_secrets_file(
+        YOUTUBE_CLIENT_SECRET_FILE,
+        SCOPES,
+        redirect_uri=f"http://localhost:{OAUTH_REDIRECT_PORT}/"
+    )
+    auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
+    return auth_url
+
+def exchange_code_for_token(code: str) -> bool:
+    """Exchanges authorization code for tokens and saves to TOKEN_FILE."""
+    try:
+        flow = InstalledAppFlow.from_client_secrets_file(
+            YOUTUBE_CLIENT_SECRET_FILE,
+            SCOPES,
+            redirect_uri=f"http://localhost:{OAUTH_REDIRECT_PORT}/"
+        )
+        flow.fetch_token(code=code.strip())
+        creds = flow.credentials
+        if creds and creds.valid:
+            with open(TOKEN_FILE, "w", encoding="utf-8") as token:
+                token.write(creds.to_json())
+            print("[+] Authorization token successfully saved to:", TOKEN_FILE)
+            return True
+    except Exception as e:
+        print(f"[!] Error exchanging code: {e}")
+    return False
 
 def upload_short_to_youtube(
     video_path: str, 

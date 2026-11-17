@@ -155,6 +155,7 @@ async function checkYouTubeStatus() {
       elements.ytBannerTitle.textContent = `Connected: ${data.channel.title}`;
       elements.ytBannerDesc.textContent = `Channel active with ${Number(data.channel.subscribers).toLocaleString()} subscribers (${data.channel.videoCount} videos). Ready for direct uploads!`;
       elements.btnAuthYtAction.textContent = 'Re-link Channel';
+      if (elements.btnUploadSecretFile) elements.btnUploadSecretFile.style.display = 'none';
     } else if (data.has_secret) {
       if (elements.ytStatusDot) {
         elements.ytStatusDot.className = 'status-dot';
@@ -165,9 +166,10 @@ async function checkYouTubeStatus() {
         elements.ytBannerDot.style.background = '#ffab00';
       }
       if (elements.ytStatusLabel) elements.ytStatusLabel.textContent = 'Credentials Ready';
-      elements.ytBannerTitle.textContent = 'OAuth Credentials Found';
-      elements.ytBannerDesc.textContent = 'client_secret.json detected! Click "Authorize Channel" to link your account in 5 seconds.';
+      elements.ytBannerTitle.textContent = 'OAuth Credentials Active';
+      elements.ytBannerDesc.textContent = 'client_secret.json (Project: ytshorts-514923) loaded! Click "Authorize Channel" to link in 5 seconds.';
       elements.btnAuthYtAction.textContent = 'Authorize Channel';
+      if (elements.btnUploadSecretFile) elements.btnUploadSecretFile.style.display = 'none';
     } else {
       if (elements.ytStatusDot) elements.ytStatusDot.className = 'status-dot offline';
       if (elements.ytBannerDot) elements.ytBannerDot.className = 'status-dot offline';
@@ -175,6 +177,7 @@ async function checkYouTubeStatus() {
       elements.ytBannerTitle.textContent = 'YouTube Channel: Not Connected';
       elements.ytBannerDesc.textContent = 'client_secret.json needed to connect your YouTube channel.';
       elements.btnAuthYtAction.textContent = 'Authorize Channel';
+      if (elements.btnUploadSecretFile) elements.btnUploadSecretFile.style.display = 'inline-block';
     }
   } catch (err) {
     console.error('Error checking YouTube status:', err);
@@ -214,36 +217,91 @@ if (elements.clientSecretFileInput) {
   });
 }
 
+// Direct Google OAuth URL for Desktop App
+const DIRECT_GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=620659263641-op74ptaouqu6omf6v5aq85hiljn5esb9.apps.googleusercontent.com&redirect_uri=http%3A%2F%2Flocalhost%3A54892%2F&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fyoutube.upload+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fyoutube.readonly&prompt=consent&access_type=offline";
+
 // Authorize Button Action
 if (elements.btnAuthYtAction) {
   elements.btnAuthYtAction.addEventListener('click', async () => {
-    elements.authStatusMsg.textContent = 'Opening Google sign-in window...';
+    elements.authStatusMsg.innerHTML = '<span style="color: #69f0ae;">Opening Google login in a new tab...</span>';
+    
+    // Always open Google OAuth directly in a new tab
+    window.open(DIRECT_GOOGLE_AUTH_URL, '_blank');
+
+    // Also notify server to prepare listener if available
     try {
-      const res = await fetch('/api/youtube/auth', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        elements.authStatusMsg.textContent = 'Check your browser to complete Google login!';
-        let checks = 0;
-        const interval = setInterval(async () => {
-          checks++;
-          await checkYouTubeStatus();
-          if (state.youtubeStatus.authenticated || checks > 40) {
-            clearInterval(interval);
-            if (state.youtubeStatus.authenticated) {
-              elements.authStatusMsg.textContent = '🎉 Connected!';
-            } else {
-              elements.authStatusMsg.textContent = '';
-            }
-          }
-        }, 2000);
-      } else {
-        elements.authStatusMsg.textContent = `Error: ${data.error}`;
+      fetch('/api/youtube/auth', { method: 'POST' }).catch(() => {});
+    } catch (e) {}
+
+    // Show manual code paste fallback
+    const codeBox = document.getElementById('manualCodeBox');
+    if (codeBox) codeBox.style.display = 'block';
+
+    // Poll for token completion
+    let checks = 0;
+    const interval = setInterval(async () => {
+      checks++;
+      await checkYouTubeStatus();
+      if (state.youtubeStatus.authenticated || checks > 40) {
+        clearInterval(interval);
+        if (state.youtubeStatus.authenticated) {
+          elements.authStatusMsg.innerHTML = '<span style="color: #69f0ae; font-weight:700;">🎉 Channel Connected!</span>';
+          if (codeBox) codeBox.style.display = 'none';
+        }
       }
-    } catch (err) {
-      elements.authStatusMsg.textContent = `Request failed: ${err.message}`;
-    }
+    }, 2000);
   });
 }
+
+// Manual Code Submit Action
+function attachManualCodeHandler() {
+  const btn = document.getElementById('btnSubmitManualCode');
+  const input = document.getElementById('manualCodeInput');
+  const msg = document.getElementById('manualCodeMsg');
+
+  if (btn && input) {
+    btn.addEventListener('click', async () => {
+      let raw = input.value.trim();
+      if (!raw) return;
+
+      // Extract code if user pasted entire URL
+      if (raw.includes('code=')) {
+        try {
+          const urlObj = new URL(raw.startsWith('http') ? raw : 'http://localhost/' + raw);
+          raw = urlObj.searchParams.get('code') || raw;
+        } catch (e) {
+          const match = raw.match(/code=([^&]+)/);
+          if (match) raw = decodeURIComponent(match[1]);
+        }
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Verifying with Google...';
+      if (msg) msg.textContent = 'Exchanging authorization code...';
+
+      try {
+        const res = await fetch('/api/youtube/exchange_code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: raw })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (msg) msg.innerHTML = '<span style="color:#69f0ae; font-weight:700;">🎉 Channel connected successfully!</span>';
+          checkYouTubeStatus();
+        } else {
+          if (msg) msg.innerHTML = `<span style="color:#ff8a80;">Error: ${data.error || 'Invalid code'}</span>`;
+        }
+      } catch (err) {
+        if (msg) msg.innerHTML = `<span style="color:#ff8a80;">Failed: ${err.message}</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Connect Channel';
+      }
+    });
+  }
+}
+attachManualCodeHandler();
 
 /* ==========================================================================
    Tab 1: Discover Topics (Strict 15 topics, max 10 selected)

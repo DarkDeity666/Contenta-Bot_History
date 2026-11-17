@@ -137,15 +137,28 @@
             <div class="status-dot offline" id="ytBannerDot" style="width: 14px; height: 14px;"></div>
             <div>
               <h3 id="ytBannerTitle" style="font-size: 16px; margin-bottom: 2px;">YouTube Channel: Not Connected</h3>
-              <p id="ytBannerDesc" style="font-size: 13px; color: var(--text-muted);">client_secret.json detected! Click Authorize Channel to connect.</p>
+              <p id="ytBannerDesc" style="font-size: 13px; color: var(--text-muted);">client_secret.json (Project: ytshorts-514923) ready! Click Authorize Channel or run run_youtube_auth.bat.</p>
             </div>
           </div>
           <div style="display: flex; gap: 10px; align-items: center;">
-            <button class="btn btn-outline btn-sm" id="btnUploadSecretFile">📁 Upload client_secret.json</button>
+            <button class="btn btn-outline btn-sm" id="btnUploadSecretFile" style="display:none;">📁 Upload client_secret.json</button>
             <input type="file" id="clientSecretFileInput" accept=".json" style="display:none">
             <button class="btn btn-primary btn-sm" id="btnAuthYtAction">Authorize Channel</button>
             <span id="authStatusMsg" style="font-size: 12px; color: var(--text-muted);"></span>
           </div>
+        </div>
+
+        <div id="manualCodeBox" class="card" style="display: none; margin-bottom: 24px; padding: 18px 24px; background: rgba(124, 77, 255, 0.1); border: 1px solid var(--primary);">
+          <h4 style="font-size: 14px; margin-bottom: 6px; color: var(--primary);">Google OAuth Login Tab Opened</h4>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+            1. Select your Google account and grant permission in the tab that just opened.<br>
+            2. When Google redirects to <code>http://localhost:54892/?code=...</code>, if it connects automatically, you are done! If not, simply paste that URL or code below:
+          </p>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="manualCodeInput" class="form-input" placeholder="Paste redirected URL or authorization code here..." style="flex: 1;">
+            <button class="btn btn-primary btn-sm" id="btnSubmitManualCode">Connect Channel</button>
+          </div>
+          <div id="manualCodeMsg" style="font-size: 12px; margin-top: 6px;"></div>
         </div>
 
         <div class="upload-queue-container" id="uploadQueueContainer">
