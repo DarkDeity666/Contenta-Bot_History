@@ -15,16 +15,25 @@ from database import get_connection
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 TOKEN_FILE = BASE_DIR / "youtube_token.json"
 
-def get_authenticated_service():
+def get_authenticated_service(interactive: bool = True):
     """Authenticates using OAuth 2.0 on custom isolated port 54892."""
     creds = None
     if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+        try:
+            creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+        except Exception:
+            creds = None
         
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except Exception:
+                if not interactive:
+                    return None
         else:
+            if not interactive:
+                return None
             if not os.path.exists(YOUTUBE_CLIENT_SECRET_FILE):
                 print(f"[!] YouTube client secret file not found at: {YOUTUBE_CLIENT_SECRET_FILE}")
                 print("[!] To enable real uploads, place your OAuth client_secret.json from Google Cloud Console into the project folder.")
@@ -40,10 +49,11 @@ def get_authenticated_service():
                 success_message="Antigravity History Bot authorized successfully! You may close this tab."
             )
             
-        with open(TOKEN_FILE, "w", encoding="utf-8") as token:
-            token.write(creds.to_json())
+        if creds and creds.valid:
+            with open(TOKEN_FILE, "w", encoding="utf-8") as token:
+                token.write(creds.to_json())
             
-    return build("youtube", "v3", credentials=creds)
+    return build("youtube", "v3", credentials=creds) if creds and creds.valid else None
 
 def upload_short_to_youtube(
     video_path: str, 
@@ -103,6 +113,28 @@ def upload_short_to_youtube(
     video_id = response.get("id")
     print(f"[+] Video uploaded successfully! YouTube URL: https://youtube.com/shorts/{video_id}")
     return video_id
+
+def get_channel_details() -> Optional[Dict[str, Any]]:
+    """Retrieves authenticated channel information if credentials are valid."""
+    try:
+        youtube = get_authenticated_service(interactive=False)
+        if not youtube:
+            return None
+        response = youtube.channels().list(part="snippet,statistics", mine=True).execute()
+        items = response.get("items", [])
+        if items:
+            ch = items[0]
+            return {
+                "id": ch.get("id"),
+                "title": ch["snippet"].get("title", "YouTube Channel"),
+                "customUrl": ch["snippet"].get("customUrl", ""),
+                "thumbnail": ch["snippet"]["thumbnails"]["default"]["url"],
+                "subscribers": ch["statistics"].get("subscriberCount", "0"),
+                "videoCount": ch["statistics"].get("videoCount", "0")
+            }
+    except Exception as e:
+        print(f"[!] Channel info fetch error: {e}")
+    return None
 
 if __name__ == "__main__":
     result = upload_short_to_youtube(

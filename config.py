@@ -34,8 +34,9 @@ MAX_CONCURRENT_RENDERS = 1        # Render 1 video at a time
 FFMPEG_THREADS = 2                # Limit CPU threads so IDE never stutters
 
 # Network & Port Isolation
-# Using obscure unassigned high port to NEVER touch 3000, 8000, 8080, etc.
-OAUTH_REDIRECT_PORT = 54892
+# Using obscure unassigned high ports (54880, 54892) to NEVER collide with 3000, 8000, 8080, etc.
+STUDIO_PORT = int(os.getenv("STUDIO_PORT", 54880))
+OAUTH_REDIRECT_PORT = int(os.getenv("OAUTH_REDIRECT_PORT", 54892))
 
 # Video & Persona Settings
 VIDEO_WIDTH = 1080

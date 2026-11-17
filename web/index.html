@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contenta History Bot Studio</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="logo-box">
+        <div class="logo-icon">⏳</div>
+        <div class="logo-text">
+          <h2>Contenta</h2>
+          <span>History Video Studio</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="tab-discover">
+          <span class="nav-icon">🔍</span>
+          <span>1. Discover Topics</span>
+        </button>
+        <button class="nav-item" data-tab="tab-scripts">
+          <span class="nav-icon">📝</span>
+          <span>2. Research & Scripts</span>
+        </button>
+        <button class="nav-item" data-tab="tab-videos">
+          <span class="nav-icon">🎬</span>
+          <span>3. Video Vault</span>
+        </button>
+        <button class="nav-item" data-tab="tab-upload">
+          <span class="nav-icon">🚀</span>
+          <span>4. YouTube Studio</span>
+        </button>
+      </nav>
+
+      <div class="yt-status-widget" id="ytStatusWidget">
+        <div class="status-indicator-box">
+          <div class="status-dot offline" id="ytStatusDot"></div>
+          <span class="status-label" id="ytStatusLabel">Checking YouTube...</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btnConnectYt">Connect Channel</button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Header -->
+      <header class="app-header">
+        <div class="header-title-box">
+          <h1 id="tabTitle">Discover Viral Historical Topics</h1>
+          <p id="tabSubtitle">Mine bizarre, high-stakes true events from verified archives and internet communities</p>
+        </div>
+        <div class="header-actions">
+          <span class="badge badge-engine">2.5D Blender Engine Active</span>
+        </div>
+      </header>
+
+      <!-- TAB 1: DISCOVER TOPICS -->
+      <section class="tab-pane active" id="tab-discover">
+        <div class="search-panel card">
+          <div class="search-input-group">
+            <span class="search-icon">🔎</span>
+            <input type="text" id="topicSearchInput" placeholder="Search eras, themes or keywords (e.g. 'renaissance bizarre', 'military blunders', 'disasters')...">
+            <button class="btn btn-primary" id="btnScrapeTopics">
+              <span class="btn-spinner" id="scrapeSpinner"></span>
+              <span>Scrape Internet & Find Topics</span>
+            </button>
+          </div>
+          <div class="quick-tags">
+            <span class="quick-tag-label">Trending Themes:</span>
+            <button class="chip" data-query="bizarre royal scandals">Royal Scandals</button>
+            <button class="chip" data-query="ancient warfare absurdities">Ancient Warfare</button>
+            <button class="chip" data-query="unbelievable military blunders">Military Blunders</button>
+            <button class="chip" data-query="deadly historical accidents">Deadly Accidents</button>
+            <button class="chip" data-query="eccentric geniuses">Eccentric Geniuses</button>
+          </div>
+        </div>
+
+        <div class="results-header">
+          <div class="results-count">
+            <span id="topicCount">15</span> Topics Found &bull; <strong style="color:var(--primary);"><span id="selectedCount">0</span> / 10 Selected</strong>
+          </div>
+          <div class="results-actions">
+            <button class="btn btn-outline btn-sm" id="btnSelectTen">Select First 10</button>
+            <button class="btn btn-outline btn-sm" id="btnDeselectAll">Clear Selection</button>
+            <button class="btn btn-primary btn-sm" id="btnGenerateSelected" disabled>
+              Generate Content-Rich Scripts (<span id="btnSelectNum">0</span>/10)
+            </button>
+          </div>
+        </div>
+
+        <div class="topic-grid" id="topicGrid">
+          <!-- Populated dynamically via app.js -->
+        </div>
+      </section>
+
+      <!-- TAB 2: SCRIPTS & RESEARCH -->
+      <section class="tab-pane" id="tab-scripts">
+        <div class="scripts-toolbar card">
+          <div class="toolbar-info">
+            <h3>Viral 6-Beat Script Builder</h3>
+            <p>Each script follows the proven formula: 1-sentence paradox hook, concrete setting, escalation, mystery, "You see," pivot, and ironic punchline.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button class="btn btn-success" id="btnRenderAllScripts">
+              <span>Render All Videos in Blender 4.2</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="scripts-list" id="scriptsList">
+          <!-- Populated dynamically via app.js -->
+        </div>
+      </section>
+
+      <!-- TAB 3: VIDEOS & PREVIEW -->
+      <section class="tab-pane" id="tab-videos">
+        <div class="video-grid-header">
+          <h2>Completed 2D/2.5D Animated Shorts</h2>
+          <button class="btn btn-outline btn-sm" id="btnRefreshVideos">Refresh Vault</button>
+        </div>
+
+        <div class="video-grid" id="videoGrid">
+          <!-- Populated dynamically via app.js -->
+        </div>
+      </section>
+
+      <!-- TAB 4: YOUTUBE STUDIO & BATCH PUBLISHING -->
+      <section class="tab-pane" id="tab-upload">
+        <div class="card yt-channel-status-bar" style="margin-bottom: 24px; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div class="status-dot offline" id="ytBannerDot" style="width: 14px; height: 14px;"></div>
+            <div>
+              <h3 id="ytBannerTitle" style="font-size: 16px; margin-bottom: 2px;">YouTube Channel: Not Connected</h3>
+              <p id="ytBannerDesc" style="font-size: 13px; color: var(--text-muted);">client_secret.json detected! Click Authorize Channel to connect.</p>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button class="btn btn-outline btn-sm" id="btnUploadSecretFile">📁 Upload client_secret.json</button>
+            <input type="file" id="clientSecretFileInput" accept=".json" style="display:none">
+            <button class="btn btn-primary btn-sm" id="btnAuthYtAction">Authorize Channel</button>
+            <span id="authStatusMsg" style="font-size: 12px; color: var(--text-muted);"></span>
+          </div>
+        </div>
+
+        <div class="upload-queue-container" id="uploadQueueContainer">
+          <div class="upload-queue-toolbar">
+            <div class="queue-counter-badge">
+              <span id="queueCountText">0 Videos Ready for Publishing Review</span>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button class="btn btn-outline btn-sm" id="btnSelectAllQueue">Select All</button>
+              <button class="btn btn-outline btn-sm" id="btnDeselectAllQueue">Deselect All</button>
+              <button class="btn btn-primary" id="btnPublishSelectedBatch" style="padding: 10px 22px; font-weight: 700;">
+                🚀 Publish Selected to YouTube (<span id="publishCountNum">0</span>)
+              </button>
+            </div>
+          </div>
+
+          <div id="batchUploadFeedback" style="margin-top: 4px;"></div>
+
+          <div class="upload-queue-list" id="uploadQueueList">
+            <!-- Populated dynamically with mobile phone mockups and individual selection checkboxes via app.js -->
+            <div class="card" style="text-align: center; padding: 48px; color: var(--text-dim);">
+              <h3>No videos in upload queue</h3>
+              <p>Generate animated videos in the <strong>Research & Scripts</strong> tab or select them from the <strong>Video Vault</strong>.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Real-Time Progress Overlay -->
+  <div class="progress-overlay" id="progressOverlay">
+    <div class="progress-card">
+      <h3 id="progressTitle" style="font-size: 18px; margin-bottom: 8px;">Synthesizing 6-Beat Screenplays...</h3>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progressBarFill"></div>
+      </div>
+      <p class="progress-status-msg" id="progressStatusMsg">Deep researching Wikipedia archives and fact-checking primary sources...</p>
+    </div>
+  </div>
+
+  <!-- Video Playback Modal -->
+  <div class="modal-backdrop" id="videoModal">
+    <div class="modal-content modal-video">
+      <div class="modal-header">
+        <h3 id="modalVideoTitle">Video Preview</h3>
+        <button class="modal-close" id="modalVideoClose">&times;</button>
+      </div>
+      <div class="modal-body modal-video-body">
+        <div class="phone-frame">
+          <video id="modalVideoPlayer" controls playsinline></video>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
+

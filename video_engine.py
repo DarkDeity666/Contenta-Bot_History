@@ -165,7 +165,7 @@ def render_history_short(script_id: int, mode: str = "documentary") -> str:
         for f_idx in range(total_frames):
             cur_t = f_idx / RENDER_FPS
             if mode == "documentary":
-                frame_img = render_documentary_frame(cur_t, duration)
+                frame_img = render_documentary_frame(cur_t, duration, script_id=script_id)
             else:
                 frame_img = render_master_stickman_frame(cur_t, duration, topic_title)
             proc.stdin.write(frame_img.tobytes())
