@@ -21,12 +21,12 @@
 
       <nav class="nav-menu">
         <button class="nav-item active" data-tab="tab-discover">
-          <span class="nav-icon">🔍</span>
-          <span>1. Discover Topics</span>
+          <span class="nav-icon">💡</span>
+          <span>1. Create & Direct</span>
         </button>
         <button class="nav-item" data-tab="tab-scripts">
           <span class="nav-icon">📝</span>
-          <span>2. Research & Scripts</span>
+          <span>2. Viral 6-Beat Scripts</span>
         </button>
         <button class="nav-item" data-tab="tab-videos">
           <span class="nav-icon">🎬</span>
@@ -60,42 +60,148 @@
         </div>
       </header>
 
-      <!-- TAB 1: DISCOVER TOPICS -->
+      <!-- TAB 1: DIRECT STORY STUDIO (ZERO-COST FACELESS AI SHORTS) -->
       <section class="tab-pane active" id="tab-discover">
-        <div class="search-panel card">
-          <div class="search-input-group">
-            <span class="search-icon">🔎</span>
-            <input type="text" id="topicSearchInput" placeholder="Search eras, themes or keywords (e.g. 'renaissance bizarre', 'military blunders', 'disasters')...">
-            <button class="btn btn-primary" id="btnScrapeTopics">
-              <span class="btn-spinner" id="scrapeSpinner"></span>
-              <span>Scrape Internet & Find Topics</span>
-            </button>
+        <div class="card direct-story-card">
+          <div class="direct-story-header">
+            <div class="direct-badge">⚡ 100% Free Forever &bull; Runs 100% on Your Laptop</div>
+            <h2>What viral story do you want to animate?</h2>
+            <p>Give any topic or crazy loophole in plain English. The AI crafts a high-retention 6-beat screenplay, studio-quality neural voiceover, and synced kinetic captions with $0 API costs.</p>
           </div>
-          <div class="quick-tags">
-            <span class="quick-tag-label">Trending Themes:</span>
-            <button class="chip" data-query="bizarre royal scandals">Royal Scandals</button>
-            <button class="chip" data-query="ancient warfare absurdities">Ancient Warfare</button>
-            <button class="chip" data-query="unbelievable military blunders">Military Blunders</button>
-            <button class="chip" data-query="deadly historical accidents">Deadly Accidents</button>
-            <button class="chip" data-query="eccentric geniuses">Eccentric Geniuses</button>
+
+          <!-- Prompt / Topic Input -->
+          <div class="topic-input-container">
+            <label for="customTopicInput" class="input-label">Story Topic, Loophole, or Crazy Fact:</label>
+            <div class="textarea-wrapper">
+              <textarea id="customTopicInput" rows="3" placeholder="e.g. The man who bought an entire bank for $1. Hook the viewer in the first 2 seconds!"></textarea>
+            </div>
+            
+            <div class="preset-topics">
+              <span class="preset-label">🔥 Quick Ideas:</span>
+              <button class="preset-chip" data-topic="The man who bought an entire bank for $1">🏦 Bank for $1</button>
+              <button class="preset-chip" data-topic="When Pepsi commanded the 6th largest military navy in the world">🚢 Pepsi Soviet Navy</button>
+              <button class="preset-chip" data-topic="A Roman Emperor who ordered thirty thousand soldiers to stab the ocean">🌊 Caligula vs Ocean</button>
+              <button class="preset-chip" data-topic="The 1904 Olympic marathon winner who was fueled by rat poison and brandy">🏃 1904 Rat Poison Marathon</button>
+              <button class="preset-chip" data-topic="Triboulet: The royal court jester who slapped the King on the butt and joked out of execution">👑 Triboulet Royal Loophole</button>
+            </div>
+          </div>
+
+          <!-- Visual Style Selector (6 Styles from the Faceless Shorts Guide) -->
+          <div class="style-selector-section">
+            <label class="input-label">🎨 Pick Your Visual Style (from the Beginner's Guide):</label>
+            <div class="style-grid" id="styleGrid">
+              <div class="style-card selected" data-style="tall_tale_3d">
+                <div class="style-badge-tag">Most Popular</div>
+                <div class="style-icon">🎭</div>
+                <div class="style-title">Tall Tale 3D</div>
+                <div class="style-desc">Funny true stories, crazy loopholes, heists & weird history. 2D cartoon characters in bright 3D miniature world.</div>
+              </div>
+              <div class="style-card" data-style="deep_dive_3d">
+                <div class="style-icon">🩻</div>
+                <div class="style-title">Deep Dive 3D</div>
+                <div class="style-desc">Zack D. Films style 3D medical & body explainers with transparent x-ray cutaways.</div>
+              </div>
+              <div class="style-card" data-style="inside_out">
+                <div class="style-icon">🔬</div>
+                <div class="style-title">Inside Out</div>
+                <div class="style-desc">Quick science, biology, and health explainers in clean 2D anatomical cutaways.</div>
+              </div>
+              <div class="style-card" data-style="stick_story">
+                <div class="style-icon">🏃</div>
+                <div class="style-title">Stick Story</div>
+                <div class="style-desc">Survival life hacks, absurd decisions, and 'What would you do' scenarios with stick figures.</div>
+              </div>
+              <div class="style-card" data-style="night_file_3d">
+                <div class="style-icon">🕵️</div>
+                <div class="style-title">Night File 3D</div>
+                <div class="style-desc">Dark, eerie unsolved mysteries, cold war secrets, and suspenseful historical lore.</div>
+              </div>
+              <div class="style-card" data-style="paper_atlas">
+                <div class="style-icon">🗺️</div>
+                <div class="style-title">Paper Atlas</div>
+                <div class="style-desc">Historic conquests, ancient empires, and legendary sea voyages on animated parchment maps.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pacing & Looping Secret Controls -->
+          <div class="viral-options-row">
+            <div class="viral-option">
+              <label class="option-label">⏱️ Target Duration:</label>
+              <select id="pacingSelect" class="form-select">
+                <option value="viral_35s" selected>35s Viral High-Retention (Recommended, ~100 words)</option>
+                <option value="standard_55s">55s In-Depth Master Story (~150 words)</option>
+              </select>
+            </div>
+            <div class="viral-toggle-box">
+              <label class="toggle-control">
+                <input type="checkbox" id="checkSeamlessLoop" checked>
+                <span>🔁 Seamless Infinite Replay Loop (Last sentence loops to Hook)</span>
+              </label>
+              <label class="toggle-control">
+                <input type="checkbox" id="checkPunchlineHook" checked>
+                <span>💥 2-Second Punchline Hook (Zero boring intros)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Primary Action Button -->
+          <div class="direct-story-actions">
+            <button class="btn btn-primary btn-lg" id="btnCreateViralScript">
+              <span class="btn-spinner" id="directStorySpinner" style="display:none;"></span>
+              <span>✨ Generate 6-Beat Screenplay & Animate Video</span>
+            </button>
           </div>
         </div>
 
-        <div class="results-header">
-          <div class="results-count">
-            <span id="topicCount">15</span> Topics Found &bull; <strong style="color:var(--primary);"><span id="selectedCount">0</span> / 10 Selected</strong>
+        <!-- Generated Screenplay Result Preview Card -->
+        <div id="liveScriptPreviewCard" class="card live-script-card" style="display: none; margin-top: 24px;">
+          <div class="live-script-header">
+            <div>
+              <div class="live-badge" id="liveScriptStyleBadge">Tall Tale 3D &bull; 35s Viral Pace</div>
+              <h3 id="liveScriptTitle">Script Title</h3>
+            </div>
+            <div class="live-actions">
+              <button class="btn btn-success" id="btnRenderLiveScript">
+                <span class="btn-spinner" id="renderSpinner" style="display:none;"></span>
+                <span>🎬 Render 3D Video Now ($0 Neural Voice + Kinetic Subtitles)</span>
+              </button>
+            </div>
           </div>
-          <div class="results-actions">
-            <button class="btn btn-outline btn-sm" id="btnSelectTen">Select First 10</button>
-            <button class="btn btn-outline btn-sm" id="btnDeselectAll">Clear Selection</button>
-            <button class="btn btn-primary btn-sm" id="btnGenerateSelected" disabled>
-              Generate Content-Rich Scripts (<span id="btnSelectNum">0</span>/10)
-            </button>
-          </div>
-        </div>
 
-        <div class="topic-grid" id="topicGrid">
-          <!-- Populated dynamically via app.js -->
+          <div class="screenplay-beats-grid">
+            <div class="beat-item hook-beat">
+              <span class="beat-tag">1. 2-Second Hook (0-2s)</span>
+              <p id="liveBeatHook"></p>
+            </div>
+            <div class="beat-item">
+              <span class="beat-tag">2. Setting (2-6s)</span>
+              <p id="liveBeatSetting"></p>
+            </div>
+            <div class="beat-item">
+              <span class="beat-tag">3. Fast Escalation (6-16s)</span>
+              <p id="liveBeatEscalation"></p>
+            </div>
+            <div class="beat-item">
+              <span class="beat-tag">4. The Mystery (16-22s)</span>
+              <p id="liveBeatMystery"></p>
+            </div>
+            <div class="beat-item pivot-beat">
+              <span class="beat-tag">5. "You see," Loophole Pivot (22-29s)</span>
+              <p id="liveBeatPivot"></p>
+            </div>
+            <div class="beat-item payoff-beat">
+              <span class="beat-tag">6. Ironic Payoff & Infinite Loop (29-35s)</span>
+              <p id="liveBeatPayoff"></p>
+              <div class="loop-note" id="liveBeatLoop"></div>
+            </div>
+          </div>
+
+          <div class="live-meta-row">
+            <div><strong>Voiceover:</strong> Ultra-realistic Neural Audio (Free edge-tts)</div>
+            <div><strong>Subtitles:</strong> Auto-synced Kinetic ASS with Viral Yellow Highlights</div>
+            <div><strong>Channel:</strong> Ready for Time Riddles (@timeriddlesyt)</div>
+          </div>
         </div>
       </section>
 
@@ -187,17 +293,6 @@
         </div>
       </section>
     </main>
-  </div>
-
-  <!-- Real-Time Progress Overlay -->
-  <div class="progress-overlay" id="progressOverlay">
-    <div class="progress-card">
-      <h3 id="progressTitle" style="font-size: 18px; margin-bottom: 8px;">Synthesizing 6-Beat Screenplays...</h3>
-      <div class="progress-bar-track">
-        <div class="progress-bar-fill" id="progressBarFill"></div>
-      </div>
-      <p class="progress-status-msg" id="progressStatusMsg">Deep researching Wikipedia archives and fact-checking primary sources...</p>
-    </div>
   </div>
 
   <!-- Video Playback Modal -->

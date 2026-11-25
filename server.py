@@ -12,8 +12,8 @@ from aiohttp import web
 from typing import Dict, Any, List, Optional
 
 from config import BASE_DIR, OUTPUT_DIR, YOUTUBE_CLIENT_SECRET_FILE, STUDIO_PORT
-import enhanced_scraper
 import youtube_uploader
+import story_director
 
 WEB_DIR = BASE_DIR / "web"
 SCRIPTS_CACHE_FILE = OUTPUT_DIR / "scripts_vault.json"
@@ -127,80 +127,44 @@ async def handle_media(request):
         raise web.HTTPNotFound(text="Media file not found")
     return web.FileResponse(filepath)
 
-# --- Topic APIs ---
-async def api_search_topics(request):
-    query = request.query.get("q", "").strip()
-    count = int(request.query.get("count", 15))
-    topics = enhanced_scraper.get_discovered_topics(query=query if query else None, count=count)
-    return web.json_response({"topics": topics})
-
-# --- Script APIs ---
-async def api_generate_scripts(request):
-    data = await request.json()
-    topic_ids = data.get("topic_ids", [])[:10]  # Hard cap at maximum 10 topics
-    
-    # Generate content-rich 6-beat scripts for selected topics
-    new_scripts = []
-    loop = asyncio.get_event_loop()
-    
-    for t_id in topic_ids:
-        # Check if already scripted
-        existing = next((s for s in cached_scripts if s.get("id") == t_id), None)
-        if existing:
-            new_scripts.append(existing)
-            continue
-            
-        topic = next((t for t in enhanced_scraper.CURATED_VIRAL_VAULT if t["id"] == t_id), None)
-        if not topic:
-            # Fallback search in discovered topics
-            all_topics = enhanced_scraper.get_discovered_topics(count=30)
-            topic = next((t for t in all_topics if t["id"] == t_id), None)
-            
-        if topic:
-            # Perform deep Wikipedia & archive research in executor
-            research = await loop.run_in_executor(None, lambda t=topic: enhanced_scraper.deep_research_topic(t))
-            
-            title = research["title"]
-            hook = research.get("hook", f"The unbelievable true record of {title}.")
-            facts = research.get("deep_facts", topic.get("summary", ""))
-            irony = research.get("ironic_twist", "")
-            era = research.get("era", "History")
-            source = research.get("source", "Primary Historical Archives")
-
-            # Extract concrete escalation steps from research facts
-            sentences = [s.strip() for s in facts.replace("\n", " ").split(". ") if len(s.strip()) > 15]
-            escalation_text = ". ".join(sentences[1:3]) if len(sentences) >= 3 else facts[:240]
-            
-            clean_title_str = title[:82].rsplit(' ', 1)[0] if len(title) > 85 else title
-            suggested_short_title = f"{clean_title_str} #Shorts"
-            
-            script_obj = {
-                "id": topic["id"],
-                "title": title,
-                "hook": hook,
-                "setting": f"The drama unfolded in {era}, where ordinary social hierarchies and laws suddenly collapsed.",
-                "escalation": escalation_text,
-                "mystery": f"How did the key figures attempt to survive or justify the unbelievable chaos?",
-                "pivot": f"You see, surviving manuscripts and trial records reveal a bizarre tactical pivot that nobody saw coming.",
-                "payoff": irony if irony else f"In the end, history recorded this as one of the most astonishing paradoxes of {era}.",
-                "full_narration": f"{hook} Set in {era}. {escalation_text} You see, records reveal what truly happened. {irony}",
-                "est_duration": "1:35",
-                "word_count": 140,
-                "citations": source,
-                "suggested_title": suggested_short_title,
-                "suggested_desc": f"The incredible true historical record of {title}.\n\n"
-                                  f"📚 Historical Citations: {source}\n\n"
-                                  f"🔔 Subscribe for daily animated history anomalies!\n\n"
-                                  f"#History #Shorts #HistoricalFacts #DidYouKnow #UntoldHistory #Documentary"
-            }
-            new_scripts.append(script_obj)
-            cached_scripts.append(script_obj)
-
-    save_cached_scripts()
-    return web.json_response({"scripts": new_scripts})
-
 async def api_get_scripts(request):
     return web.json_response({"scripts": cached_scripts})
+
+async def api_create_custom_script(request):
+    try:
+        data = await request.json()
+        topic = data.get("topic", "").strip()
+        style = data.get("style", "tall_tale_3d")
+        duration = data.get("duration", "viral_35s")
+        seamless_loop = data.get("seamless_loop", True)
+        hook_type = data.get("hook_type", "paradox")
+        
+        if not topic:
+            return web.json_response({"success": False, "error": "Please provide a story topic or loophole!"})
+            
+        loop = asyncio.get_event_loop()
+        script = await loop.run_in_executor(
+            None,
+            lambda: story_director.synthesize_viral_script(
+                topic=topic,
+                style=style,
+                duration=duration,
+                seamless_loop=seamless_loop,
+                hook_type=hook_type
+            )
+        )
+        
+        # Check if already present, or insert at front
+        existing_idx = next((i for i, s in enumerate(cached_scripts) if s.get("id") == script["id"]), None)
+        if existing_idx is not None:
+            cached_scripts[existing_idx] = script
+        else:
+            cached_scripts.insert(0, script)
+            
+        save_cached_scripts()
+        return web.json_response({"success": True, "script": script})
+    except Exception as e:
+        return web.json_response({"success": False, "error": str(e)})
 
 def find_matching_script(filename: str) -> Optional[Dict[str, Any]]:
     fn = filename.lower()
@@ -332,7 +296,7 @@ async def api_youtube_auth(request):
         return web.json_response({
             "success": False, 
             "error": "client_secret.json not found."
-        }, status=400)
+        })
         
     try:
         from google_auth_oauthlib.flow import InstalledAppFlow
@@ -351,7 +315,7 @@ async def api_youtube_auth(request):
             "message": "Google authentication link generated."
         })
     except Exception as e:
-        return web.json_response({"success": False, "error": str(e)}, status=500)
+        return web.json_response({"success": False, "error": str(e)})
 
 async def api_youtube_exchange_code(request):
     data = await request.json()
@@ -472,10 +436,37 @@ async def api_upload_batch(request):
     return web.json_response({"success": True, "results": results})
 
 async def api_render_generate(request):
-    data = await request.json()
-    script_id = data.get("script_id")
-    # Queued render
-    return web.json_response({"success": True, "message": f"Render queued for script {script_id}"})
+    try:
+        data = await request.json()
+        script_id = data.get("script_id")
+        
+        # Find matching script
+        script = next((s for s in cached_scripts if s.get("id") == script_id), None)
+        if not script:
+            # Fallback to the first available script if none matches id
+            if cached_scripts:
+                script = cached_scripts[0]
+            else:
+                return web.json_response({"success": False, "error": f"Script not found: {script_id}"})
+                
+        loop = asyncio.get_event_loop()
+        out_file = await loop.run_in_executor(
+            None,
+            lambda: story_director.render_script_video(script)
+        )
+        
+        if out_file and os.path.exists(out_file):
+            fn = os.path.basename(out_file)
+            return web.json_response({
+                "success": True, 
+                "video_file": fn,
+                "video_url": f"/media/{fn}",
+                "message": f"Render completed: {fn}"
+            })
+        else:
+            return web.json_response({"success": False, "error": "Video rendering failed during FFmpeg composite."})
+    except Exception as e:
+        return web.json_response({"success": False, "error": str(e)})
 
 # ---------------------------------------------------------------------------
 # App Initialization
@@ -489,8 +480,7 @@ def create_app():
     app.router.add_get("/media/{filename}", handle_media)
 
     # API Routes
-    app.router.add_get("/api/topics/search", api_search_topics)
-    app.router.add_post("/api/scripts/generate", api_generate_scripts)
+    app.router.add_post("/api/scripts/create-custom", api_create_custom_script)
     app.router.add_get("/api/scripts", api_get_scripts)
     app.router.add_get("/api/videos", api_get_videos)
     app.router.add_get("/api/youtube/status", api_youtube_status)

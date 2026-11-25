@@ -7,8 +7,6 @@
 // Application State
 const state = {
   activeTab: 'tab-discover',
-  topics: [],
-  selectedTopicIds: new Set(),
   scripts: [],
   videos: [],
   queueItems: [], // Items ready for YouTube upload review
@@ -18,8 +16,6 @@ const state = {
     channel: null
   }
 };
-
-const MAX_TOPIC_SELECTION = 10;
 
 // DOM References
 const elements = {
@@ -39,19 +35,6 @@ const elements = {
   authStatusMsg: document.getElementById('authStatusMsg'),
   clientSecretFileInput: document.getElementById('clientSecretFileInput'),
   btnUploadSecretFile: document.getElementById('btnUploadSecretFile'),
-
-  // Tab 1: Discover Topics
-  topicSearchInput: document.getElementById('topicSearchInput'),
-  btnScrapeTopics: document.getElementById('btnScrapeTopics'),
-  scrapeSpinner: document.getElementById('scrapeSpinner'),
-  quickChips: document.querySelectorAll('.chip'),
-  topicGrid: document.getElementById('topicGrid'),
-  topicCount: document.getElementById('topicCount'),
-  selectedCount: document.getElementById('selectedCount'),
-  btnSelectNum: document.getElementById('btnSelectNum'),
-  btnSelectTen: document.getElementById('btnSelectTen'),
-  btnDeselectAll: document.getElementById('btnDeselectAll'),
-  btnGenerateSelected: document.getElementById('btnGenerateSelected'),
 
   // Tab 2: Scripts
   scriptsList: document.getElementById('scriptsList'),
@@ -74,20 +57,14 @@ const elements = {
   videoModal: document.getElementById('videoModal'),
   modalVideoPlayer: document.getElementById('modalVideoPlayer'),
   modalVideoTitle: document.getElementById('modalVideoTitle'),
-  modalVideoClose: document.getElementById('modalVideoClose'),
-
-  // Progress Overlay
-  progressOverlay: document.getElementById('progressOverlay'),
-  progressTitle: document.getElementById('progressTitle'),
-  progressBarFill: document.getElementById('progressBarFill'),
-  progressStatusMsg: document.getElementById('progressStatusMsg')
+  modalVideoClose: document.getElementById('modalVideoClose')
 };
 
 // Tab Meta Descriptions
 const tabMeta = {
   'tab-discover': {
-    title: 'Discover 15 Viral Historical Topics',
-    subtitle: 'Mine bizarre, high-stakes true events from verified archives (Select up to 10 for batch synthesis)'
+    title: 'Zero-Cost Faceless AI Shorts Studio',
+    subtitle: 'Give any topic or loophole in plain English, choose your visual style, and generate viral 35s animated shorts with $0 API costs'
   },
   'tab-scripts': {
     title: 'Research & 6-Beat Screenplays',
@@ -95,13 +72,32 @@ const tabMeta = {
   },
   'tab-videos': {
     title: 'Video Vault & Mobile Previews',
-    subtitle: 'Browse master animated vertical shorts rendered in Blender 4.2 with 2.5D camera depth'
+    subtitle: 'Browse master animated vertical shorts rendered in Blender with 2.5D camera depth'
   },
   'tab-upload': {
     title: 'YouTube Studio & Publishing Review Queue',
     subtitle: 'Preview Shorts with mobile frame overlays, deselect unwanted videos, and batch upload to your channel'
   }
 };
+
+/* ==========================================================================
+   Safe Fetch Helper (Prevents JSON parse crashes)
+   ========================================================================== */
+async function safeFetchJson(url, options = {}) {
+  try {
+    const res = await fetch(url, options);
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch (parseErr) {
+      console.warn(`Non-JSON response from ${url}:`, text.slice(0, 150));
+      return { success: false, error: text || `HTTP ${res.status}` };
+    }
+  } catch (netErr) {
+    console.error(`Network error requesting ${url}:`, netErr);
+    return { success: false, error: netErr.message || 'Network error' };
+  }
+}
 
 /* ==========================================================================
    Navigation
@@ -144,8 +140,7 @@ if (elements.btnConnectYt) {
    ========================================================================== */
 async function checkYouTubeStatus() {
   try {
-    const res = await fetch('/api/youtube/status');
-    const data = await res.json();
+    const data = await safeFetchJson('/api/youtube/status');
     state.youtubeStatus = data;
 
     if (data.authenticated && data.channel) {
@@ -234,8 +229,7 @@ if (elements.btnAuthYtAction) {
     elements.authStatusMsg.innerHTML = '<span style="color: #69f0ae;">Connecting to Google...</span>';
     
     try {
-      const res = await fetch('/api/youtube/auth', { method: 'POST' });
-      const data = await res.json();
+      const data = await safeFetchJson('/api/youtube/auth', { method: 'POST' });
       if (data.success && data.auth_url) {
         // Navigate directly to Google login - Google will automatically redirect back to the studio
         window.location.href = data.auth_url;
@@ -277,12 +271,11 @@ function attachManualCodeHandler() {
       if (msg) msg.textContent = 'Exchanging authorization code...';
 
       try {
-        const res = await fetch('/api/youtube/exchange_code', {
+        const data = await safeFetchJson('/api/youtube/exchange_code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: raw })
         });
-        const data = await res.json();
         if (data.success) {
           if (msg) msg.innerHTML = '<span style="color:#69f0ae; font-weight:700;">🎉 Channel connected successfully!</span>';
           checkYouTubeStatus();
@@ -301,197 +294,163 @@ function attachManualCodeHandler() {
 attachManualCodeHandler();
 
 /* ==========================================================================
-   Tab 1: Discover Topics (Strict 15 topics, max 10 selected)
+   Tab 1: Direct Story Studio & Zero-Cost Faceless AI Shorts
    ========================================================================== */
-async function searchTopics(query = '') {
-  elements.scrapeSpinner.classList.add('active');
-  elements.btnScrapeTopics.disabled = true;
+let selectedStyle = 'tall_tale_3d';
+let currentGeneratedScript = null;
 
-  try {
-    const url = query ? `/api/topics/search?q=${encodeURIComponent(query)}&count=15` : `/api/topics/search?count=15`;
-    const res = await fetch(url);
-    const data = await res.json();
+function initDirectStoryStudio() {
+  const customTopicInput = document.getElementById('customTopicInput');
+  const btnCreateViralScript = document.getElementById('btnCreateViralScript');
+  const directStorySpinner = document.getElementById('directStorySpinner');
+  const pacingSelect = document.getElementById('pacingSelect');
+  const checkSeamlessLoop = document.getElementById('checkSeamlessLoop');
+  const checkPunchlineHook = document.getElementById('checkPunchlineHook');
+  const presetChips = document.querySelectorAll('.preset-chip');
+  const styleCards = document.querySelectorAll('.style-card');
 
-    state.topics = (data.topics || []).slice(0, 15);
-    state.selectedTopicIds.clear();
-    renderTopics();
-  } catch (err) {
-    console.error('Error fetching topics:', err);
-  } finally {
-    elements.scrapeSpinner.classList.remove('active');
-    elements.btnScrapeTopics.disabled = false;
-  }
-}
+  // Preview elements
+  const liveScriptPreviewCard = document.getElementById('liveScriptPreviewCard');
+  const liveScriptTitle = document.getElementById('liveScriptTitle');
+  const liveScriptStyleBadge = document.getElementById('liveScriptStyleBadge');
+  const liveBeatHook = document.getElementById('liveBeatHook');
+  const liveBeatSetting = document.getElementById('liveBeatSetting');
+  const liveBeatEscalation = document.getElementById('liveBeatEscalation');
+  const liveBeatMystery = document.getElementById('liveBeatMystery');
+  const liveBeatPivot = document.getElementById('liveBeatPivot');
+  const liveBeatPayoff = document.getElementById('liveBeatPayoff');
+  const liveBeatLoop = document.getElementById('liveBeatLoop');
+  const btnRenderLiveScript = document.getElementById('btnRenderLiveScript');
+  const renderSpinner = document.getElementById('renderSpinner');
 
-function renderTopics() {
-  elements.topicGrid.innerHTML = '';
-  elements.topicCount.textContent = state.topics.length;
-  updateSelectionUI();
-
-  if (state.topics.length === 0) {
-    elements.topicGrid.innerHTML = `
-      <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-dim);">
-        <h3>No topics found</h3>
-        <p>Try searching for a different keyword or click one of the trending themes above.</p>
-      </div>
-    `;
-    return;
-  }
-
-  state.topics.forEach((topic) => {
-    const isSelected = state.selectedTopicIds.has(topic.id);
-    const card = document.createElement('div');
-    card.className = `topic-card ${isSelected ? 'selected' : ''}`;
-    card.dataset.id = topic.id;
-
-    card.innerHTML = `
-      <div class="topic-card-header">
-        <input type="checkbox" class="topic-checkbox" ${isSelected ? 'checked' : ''} data-id="${topic.id}">
-        <span class="topic-era-badge">${escapeHtml(topic.era || 'Historical')}</span>
-      </div>
-      <h3 class="topic-card-title">${escapeHtml(topic.title)}</h3>
-      <div class="topic-card-hook">
-        <strong>Hook:</strong> "${escapeHtml(topic.hook || '')}"
-      </div>
-      <p class="topic-card-summary">${escapeHtml(topic.summary || '')}</p>
-      <div class="topic-card-footer">
-        <span class="topic-source">📚 ${escapeHtml(topic.source || 'Verified Archive')}</span>
-      </div>
-    `;
-
-    // Toggle on card click
-    card.addEventListener('click', (e) => {
-      if (e.target.type !== 'checkbox') {
-        const cb = card.querySelector('.topic-checkbox');
-        cb.checked = !cb.checked;
+  // 1. Preset chips click handler
+  presetChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      if (customTopicInput) {
+        customTopicInput.value = chip.dataset.topic;
+        customTopicInput.focus();
       }
-      toggleTopicSelection(topic.id);
     });
-
-    elements.topicGrid.appendChild(card);
   });
-}
 
-function toggleTopicSelection(topicId) {
-  if (state.selectedTopicIds.has(topicId)) {
-    state.selectedTopicIds.delete(topicId);
-  } else {
-    if (state.selectedTopicIds.size >= MAX_TOPIC_SELECTION) {
-      alert(`Selection limit reached! You can select a maximum of ${MAX_TOPIC_SELECTION} topics at a time.`);
-      return;
-    }
-    state.selectedTopicIds.add(topicId);
+  // 2. Style cards click handler
+  styleCards.forEach(card => {
+    card.addEventListener('click', () => {
+      styleCards.forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      selectedStyle = card.dataset.style;
+    });
+  });
+
+  // 3. Generate 6-beat screenplay
+  if (btnCreateViralScript) {
+    btnCreateViralScript.addEventListener('click', async () => {
+      const topic = customTopicInput ? customTopicInput.value.trim() : '';
+      if (!topic) {
+        alert('Please enter a story topic or click one of the quick idea presets!');
+        if (customTopicInput) customTopicInput.focus();
+        return;
+      }
+
+      btnCreateViralScript.disabled = true;
+      if (directStorySpinner) directStorySpinner.style.display = 'inline-block';
+
+      try {
+        const payload = {
+          topic: topic,
+          style: selectedStyle,
+          duration: pacingSelect ? pacingSelect.value : 'viral_35s',
+          seamless_loop: checkSeamlessLoop ? checkSeamlessLoop.checked : true,
+          hook_type: checkPunchlineHook && checkPunchlineHook.checked ? 'paradox' : 'standard'
+        };
+
+        const res = await safeFetchJson('/api/scripts/create-custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.success && res.script) {
+          currentGeneratedScript = res.script;
+          // Populate live preview card
+          if (liveScriptTitle) liveScriptTitle.textContent = res.script.title;
+          if (liveScriptStyleBadge) {
+            const styleLabel = res.script.style.replace(/_/g, ' ').toUpperCase();
+            liveScriptStyleBadge.textContent = `${styleLabel} • ${res.script.est_duration || '0:35'} Pace (${res.script.word_count || 100} words)`;
+          }
+          if (liveBeatHook) liveBeatHook.textContent = res.script.hook || '';
+          if (liveBeatSetting) liveBeatSetting.textContent = res.script.setting || '';
+          if (liveBeatEscalation) liveBeatEscalation.textContent = res.script.escalation || '';
+          if (liveBeatMystery) liveBeatMystery.textContent = res.script.mystery || '';
+          if (liveBeatPivot) liveBeatPivot.textContent = res.script.pivot || '';
+          if (liveBeatPayoff) liveBeatPayoff.textContent = res.script.payoff || '';
+          if (liveBeatLoop) {
+            if (res.script.loop_outro) {
+              liveBeatLoop.innerHTML = `<strong>Infinite Replay Loop:</strong> "${res.script.loop_outro}" <em>(flows seamlessly back into the hook)</em>`;
+              liveBeatLoop.style.display = 'block';
+            } else {
+              liveBeatLoop.style.display = 'none';
+            }
+          }
+
+          if (liveScriptPreviewCard) {
+            liveScriptPreviewCard.style.display = 'block';
+            liveScriptPreviewCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        } else {
+          alert('Could not synthesize script: ' + (res.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Script generation error: ' + err.message);
+      } finally {
+        btnCreateViralScript.disabled = false;
+        if (directStorySpinner) directStorySpinner.style.display = 'none';
+      }
+    });
   }
-  updateSelectionUI();
-  // Update card styling
-  document.querySelectorAll('.topic-card').forEach(card => {
-    const id = card.dataset.id;
-    const isSel = state.selectedTopicIds.has(id);
-    card.classList.toggle('selected', isSel);
-    const cb = card.querySelector('.topic-checkbox');
-    if (cb) cb.checked = isSel;
-  });
+
+  // 4. Render Video Button
+  if (btnRenderLiveScript) {
+    btnRenderLiveScript.addEventListener('click', async () => {
+      if (!currentGeneratedScript) return;
+
+      btnRenderLiveScript.disabled = true;
+      if (renderSpinner) renderSpinner.style.display = 'inline-block';
+      const labelSpan = btnRenderLiveScript.querySelector('span:not(.btn-spinner)');
+      if (labelSpan) labelSpan.textContent = 'Rendering 3D Video + $0 Neural Audio...';
+
+      try {
+        const res = await safeFetchJson('/api/videos/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ script_id: currentGeneratedScript.id })
+        });
+
+        if (res.success) {
+          alert(`🎉 Master Short Rendered Successfully!\n\nFile: ${res.video_file || 'history_short.mp4'}\n\nSwitching to YouTube Studio Queue for publishing...`);
+          switchTab('tab-upload');
+        } else {
+          alert('Render note: ' + (res.error || 'Video composite completed. Check Video Vault.'));
+          switchTab('tab-videos');
+        }
+      } catch (err) {
+        alert('Render error: ' + err.message);
+      } finally {
+        btnRenderLiveScript.disabled = false;
+        if (renderSpinner) renderSpinner.style.display = 'none';
+        if (labelSpan) labelSpan.textContent = '🎬 Render 3D Video Now ($0 Neural Voice + Kinetic Subtitles)';
+      }
+    });
+  }
 }
-
-function updateSelectionUI() {
-  const count = state.selectedTopicIds.size;
-  elements.selectedCount.textContent = count;
-  elements.btnSelectNum.textContent = count;
-  elements.btnGenerateSelected.disabled = count === 0;
-}
-
-// Select First 10
-elements.btnSelectTen.addEventListener('click', () => {
-  state.selectedTopicIds.clear();
-  state.topics.slice(0, MAX_TOPIC_SELECTION).forEach(t => state.selectedTopicIds.add(t.id));
-  renderTopics();
-});
-
-// Clear Selection
-elements.btnDeselectAll.addEventListener('click', () => {
-  state.selectedTopicIds.clear();
-  renderTopics();
-});
-
-// Search and Chips
-elements.btnScrapeTopics.addEventListener('click', () => {
-  searchTopics(elements.topicSearchInput.value);
-});
-
-elements.topicSearchInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') searchTopics(elements.topicSearchInput.value);
-});
-
-elements.quickChips.forEach(chip => {
-  chip.addEventListener('click', () => {
-    elements.topicSearchInput.value = chip.dataset.query;
-    searchTopics(chip.dataset.query);
-  });
-});
+initDirectStoryStudio();
 
 /* ==========================================================================
-   Tab 2: Deep Research & 6-Beat Screenplay Synthesis
+   Tab 2: Viral 6-Beat Screenplays
    ========================================================================== */
-elements.btnGenerateSelected.addEventListener('click', async () => {
-  const selectedIds = Array.from(state.selectedTopicIds).slice(0, MAX_TOPIC_SELECTION);
-  if (selectedIds.length === 0) return;
-
-  // Show Deep Research Progress Overlay
-  showProgressOverlay(`Researching & Synthesizing ${selectedIds.length} Screenplays...`);
-  let currentStep = 0;
-  const totalSteps = selectedIds.length;
-
-  const progressTimer = setInterval(() => {
-    if (currentStep < totalSteps) {
-      currentStep++;
-      const pct = Math.round((currentStep / totalSteps) * 85);
-      updateProgressBar(pct, `[${currentStep}/${totalSteps}] Deep researching Wikipedia & primary archives, constructing 6-beat screenplays...`);
-    }
-  }, 1200);
-
-  try {
-    const res = await fetch('/api/scripts/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic_ids: selectedIds })
-    });
-    const data = await res.json();
-    clearInterval(progressTimer);
-    updateProgressBar(100, `Done! Synthesized ${data.scripts ? data.scripts.length : 0} screenplays.`);
-
-    setTimeout(() => {
-      hideProgressOverlay();
-      state.scripts = data.scripts || [];
-      switchTab('tab-scripts');
-      renderScripts();
-    }, 600);
-  } catch (err) {
-    clearInterval(progressTimer);
-    hideProgressOverlay();
-    alert('Error generating scripts: ' + err.message);
-  }
-});
-
-function showProgressOverlay(title) {
-  elements.progressTitle.textContent = title;
-  elements.progressBarFill.style.width = '5%';
-  elements.progressStatusMsg.textContent = 'Connecting to historical research archives...';
-  elements.progressOverlay.classList.add('open');
-}
-
-function updateProgressBar(percentage, message) {
-  elements.progressBarFill.style.width = `${percentage}%`;
-  elements.progressStatusMsg.textContent = message;
-}
-
-function hideProgressOverlay() {
-  elements.progressOverlay.classList.remove('open');
-}
-
 async function loadScripts() {
   try {
-    const res = await fetch('/api/scripts');
-    const data = await res.json();
+    const data = await safeFetchJson('/api/scripts');
     state.scripts = data.scripts || [];
     renderScripts();
   } catch (err) {
@@ -625,8 +584,7 @@ elements.btnRenderAllScripts.addEventListener('click', async () => {
    ========================================================================== */
 async function loadVideos() {
   try {
-    const res = await fetch('/api/videos');
-    const data = await res.json();
+    const data = await safeFetchJson('/api/videos');
     state.videos = data.videos || [];
     renderVideos();
   } catch (err) {
