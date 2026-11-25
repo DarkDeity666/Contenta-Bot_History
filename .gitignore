@@ -61,8 +61,11 @@ yarn-error.log*
 output/*
 !output/.gitkeep
 
-# Temporary downloaded historical image caches
+# Temporary downloaded historical image caches & large AI voice models
 assets/images/historical_*
+assets/models/
+assets/cast_*/
+*.onnx
 
 # --- 7. OPERATING SYSTEM & IDE ARTIFACTS ---
 .DS_Store
