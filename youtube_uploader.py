@@ -10,7 +10,6 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
 from config import YOUTUBE_CLIENT_SECRET_FILE, BASE_DIR, OAUTH_REDIRECT_PORT
-from database import get_connection
 
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",

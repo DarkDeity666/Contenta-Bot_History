@@ -30,22 +30,7 @@ def load_cached_scripts():
         except Exception:
             cached_scripts = []
     if not cached_scripts:
-        # Pre-seed with Triboulet 6-beat script
-        cached_scripts = [
-            {
-                "id": "triboulet_slap",
-                "title": "Triboulet: The Court Jester Who Joked Out of His Execution",
-                "hook": "In 1520, a hunchbacked dwarf slapped the King of France directly on his royal buttocks—and lived to die of old age.",
-                "setting": "The grand Renaissance throne room of Francis I, where insulting the monarch was punishable by immediate beheading.",
-                "escalation": "The furious king offered Triboulet one chance: invent an apology more insulting than the slap itself. Triboulet bowed: 'I am terribly sorry, Your Majesty, I mistook you for the Queen!'",
-                "mystery": "How could a man condemned by royal decree escape the executioner's sharpened blade?",
-                "pivot": "You see, when Francis I granted him the final mercy of choosing his own method of execution, Triboulet found the ultimate constitutional loophole.",
-                "payoff": "Triboulet declared: 'Good sire, for Saint Nitouche's and Saint Pansard's sake, patron saints of madness, I choose to die of old age!' The king burst into laughter and banished him instead.",
-                "est_duration": "1:55",
-                "word_count": 142,
-                "citations": "Brantôme, Vies des dames galantes; Archives Nationales (France)"
-            }
-        ]
+        cached_scripts = [story_director.synthesize_viral_script("The man who bought an entire bank for $1", style="tall_tale_3d")]
 
 def save_cached_scripts():
     with open(SCRIPTS_CACHE_FILE, "w", encoding="utf-8") as f:
@@ -192,9 +177,11 @@ async def api_get_videos(request):
     videos = []
     if OUTPUT_DIR.exists():
         for file in OUTPUT_DIR.glob("*.mp4"):
+            name = file.name
+            if name.startswith("raw_"):
+                continue
             stat = file.stat()
             size_mb = round(stat.st_size / (1024 * 1024), 2)
-            name = file.name
             
             clean_title = name.replace(".mp4", "").replace("_", " ").title()
             matched_script = find_matching_script(name)
@@ -221,15 +208,12 @@ async def api_get_videos(request):
                 suggested_title = f"{clean_title} #Shorts"
                 suggested_desc = f"The incredible true historical record of {clean_title}.\n\n#History #Shorts #Animation"
                 
-            if "master" in name.lower() or "triboulet" in name.lower():
-                story_title = "⭐ " + story_title
-
             videos.append({
                 "filename": name,
                 "title": story_title,
                 "url": f"/media/{name}",
                 "size_mb": size_mb,
-                "duration_str": "1:56" if "triboulet" in name.lower() else "0:55",
+                "duration_str": "0:38",
                 "suggested_title": suggested_title,
                 "suggested_desc": suggested_desc
             })

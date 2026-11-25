@@ -11,9 +11,10 @@ import asyncio
 import hashlib
 from typing import Dict, Any, Optional, List
 from config import BASE_DIR, OUTPUT_DIR, GEMINI_API_KEY, GROQ_API_KEY, DEFAULT_VOICE
-import edge_tts
 import imageio_ffmpeg
 import subprocess
+import blender_toon_world
+import audio_studio
 
 VIRAL_SYSTEM_PROMPT = """You are an elite viral YouTube Shorts director and screenwriter specializing in faceless animated shorts with >90% retention.
 
@@ -172,6 +173,18 @@ def synthesize_local_procedural_script(
         loop_outro = "And that is the exact reason why airline loyalty managers still cringe whenever they hear about..."
         citations = "Wall Street Journal (2000); Federal Trade Commission Advertising Records"
         title_str = "The Man Who Got 1 Million Miles for Pudding"
+    elif any(w in t_low for w in ["hitler", "nazi", "propaganda", "influence", "infunce"]):
+        hook = "In 1933, an entire educated nation didn't just obey a dictator—millions cheered while handing away their freedom."
+        setting = "Crushed by hyperinflation, mass unemployment, and national humiliation, Weimar Germany was desperate for anyone promising strength."
+        escalation = "Instead of hiding power, his propaganda machine turned politics into theater. Towering night rallies bathed crowds in dramatic spotlights, while youth leagues and rewritten schoolbooks reshaped an entire generation."
+        mystery = "But how did one regime reach inside millions of private living rooms virtually overnight?"
+        pivot = "You see, the regime mass-produced a cheap government radio called the Volksempfänger—placed in almost every home, engineered with limited range so families could only hear one voice."
+        payoff = "By synchronizing fear, belonging, and constant repetition, independent thought vanished—leaving history's starkest psychological warning."
+        loop_outro = "Which explains why historians still study the exact moment when..."
+        citations = "United States Holocaust Memorial Museum Archives; Ian Kershaw, Hitler: Hubris; Goebbels Propaganda Ministry Records"
+        title_str = "How Hitler Influenced an Entire Nation"
+        if style == "tall_tale_3d":
+            style = "night_file_3d"
     else:
         # Dynamic procedural synthesis for any topic
         hook = f"History books will never prepare you for the unbelievable true story of {clean_title}."
@@ -248,182 +261,58 @@ def format_script_object(topic: str, data: Dict[str, Any], style: str, duration:
                           f"#History #Shorts #HistoricalFacts #DidYouKnow #UntoldHistory #Documentary"
     }
 
-async def generate_voiceover_async(text: str, output_path: str, voice: str = DEFAULT_VOICE) -> str:
-    """Free, studio-quality neural voiceover using edge-tts ($0 cost)."""
-    communicate = edge_tts.Communicate(text, voice, rate="+6%", pitch="+0Hz")
-    await communicate.save(output_path)
-    return output_path
-
-def generate_offline_windows_tts(text: str, output_path: str) -> str:
-    """Offline Windows speech synthesis fallback via System.Speech ($0 cost, 100% offline)."""
-    wav_path = output_path if output_path.endswith(".wav") else output_path.rsplit(".", 1)[0] + "_fallback.wav"
-    clean_text = text.replace('"', ' ').replace("'", " ")
-    ps_cmd = (
-        f"Add-Type -AssemblyName System.Speech; "
-        f"$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
-        f"$s.Rate = 1; "
-        f"$s.SetOutputToWaveFile('{wav_path}'); "
-        f"$s.Speak('{clean_text}'); "
-        f"$s.Dispose()"
-    )
-    subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
-    # If target is mp3, convert with ffmpeg
-    if output_path.endswith(".mp3"):
-        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-        subprocess.run([ffmpeg_exe, "-y", "-i", wav_path, "-c:a", "libmp3lame", "-q:a", "2", output_path],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if os.path.exists(output_path):
-            try:
-                os.remove(wav_path)
-            except Exception:
-                pass
-            return output_path
-    return wav_path
-
-def generate_voiceover(text: str, output_path: str, voice: str = DEFAULT_VOICE) -> str:
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            import nest_asyncio
-            nest_asyncio.apply()
-            return loop.run_until_complete(generate_voiceover_async(text, output_path, voice))
-        return asyncio.run(generate_voiceover_async(text, output_path, voice))
-    except Exception as e:
-        print(f"[!] Neural TTS notice ({e}), using offline Windows Speech engine...")
-        return generate_offline_windows_tts(text, output_path)
-
-def generate_kinetic_ass_subtitles(text: str, duration_sec: float, output_ass_path: str) -> str:
-    """Generates mobile-optimized ASS subtitles with viral yellow highlights."""
-    words = [w.strip() for w in text.split() if w.strip()]
-    if not words:
-        words = ["History", "Shorts"]
-        
-    step = duration_sec / len(words)
-    chunk_size = 3
-    events = []
-    
-    def format_time(s):
-        h = int(s // 3600)
-        m = int((s % 3600) // 60)
-        sec = s % 60
-        cs = int((sec - int(sec)) * 100)
-        return f"{h}:{m:02d}:{int(sec):02d}.{cs:02d}"
-
-    highlight_keywords = {"dollar", "bank", "billion", "million", "navy", "submarines", "slapped", "queen", "ocean", "poison", "loophole", "shocking", "free", "disaster", "emperor"}
-
-    ass_header = """[Script Info]
-Title: Viral Kinetic Short Subtitles
-ScriptType: v4.00+
-WrapStyle: 0
-ScaledBorderAndShadow: yes
-PlayResX: 1080
-PlayResY: 1920
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,60,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,2,40,40,400,1
-Style: PunchlineYellow,Arial,68,&H0045D4FF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,3,2,40,40,400,1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
-    i = 0
-    while i < len(words):
-        chunk = words[i:i + chunk_size]
-        t_start = i * step
-        t_end = min((i + len(chunk)) * step, duration_sec)
-        if t_end - t_start < 0.35:
-            t_end = t_start + 0.35
-            
-        chunk_clean = " ".join(chunk).replace('"', '').replace("'", "’")
-        is_highlight = any(re.sub(r'\W', '', w.lower()) in highlight_keywords for w in chunk)
-        style_name = "PunchlineYellow" if is_highlight else "Default"
-        
-        events.append(f"Dialogue: 0,{format_time(t_start)},{format_time(t_end)},{style_name},,0,0,0,,{chunk_clean}")
-        i += chunk_size
-
-    with open(output_ass_path, "w", encoding="utf-8") as f:
-        f.write(ass_header + "\n".join(events) + "\n")
-        
-    return output_ass_path
-
-def get_media_duration(file_path: str) -> float:
-    try:
-        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-        cmd = [ffmpeg_exe, "-i", file_path]
-        res = subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True)
-        m = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", res.stderr)
-        if m:
-            h, m_min, s = float(m.group(1)), float(m.group(2)), float(m.group(3))
-            return h * 3600 + m_min * 60 + s
-    except Exception:
-        pass
-    return 40.0
-
 def render_script_video(script: Dict[str, Any]) -> str:
-    """Executes the complete video render pipeline for a viral script."""
+    """
+    Executes the unified Nafay + claude-animated-shorts production pipeline:
+    1. Kokoro v1.0 local studio voiceover + Faster-Whisper word-level timestamps
+    2. Procedural music & Foley SFX synthesized & mastered to -15 LUFS
+    3. Blender 4.2 EEVEE-Next 3D Toon World + toon_cast.py 2D bean-head characters
+    4. Exact Whisper-synced bold kinetic captions & final H.264 1080x1920 mux
+    """
     script_id = script.get("id", "custom_short")
     narration = script.get("full_narration") or (
         f"{script.get('hook', '')} {script.get('setting', '')} {script.get('escalation', '')} {script.get('pivot', '')} {script.get('payoff', '')}"
     )
-    
-    # 1. Voiceover ($0 cost edge-tts neural voice)
-    voice_path = os.path.join(str(OUTPUT_DIR), f"voice_{script_id}.mp3")
-    print(f"[*] Synthesizing $0 neural voiceover for '{script.get('title')}'...")
-    generate_voiceover(narration, voice_path)
-    duration = get_media_duration(voice_path)
-    
-    # 2. Word-by-word kinetic ASS subtitles with viral yellow highlights
-    ass_path = os.path.join(str(OUTPUT_DIR), f"subtitles_{script_id}.ass")
-    generate_kinetic_ass_subtitles(narration, duration, ass_path)
-    
-    # 3. Base animation video source
-    raw_video = os.path.join(str(OUTPUT_DIR), "triboulet_raw.mp4")
-    if not os.path.exists(raw_video):
-        raw_video = os.path.join(str(OUTPUT_DIR), "preview_2d_25d.mp4")
-        
+
+    # 1. Kokoro Voice + Whisper Subtitles + Procedural Music/Foley (-15 LUFS Mix)
+    mix_wav, ass_path, duration, words = audio_studio.produce_studio_audio_and_subtitles(script, narration, script_id)
+
+    # 2. Render 3D Toon World Animation in Blender 4.2 EEVEE-Next
+    raw_video = blender_toon_world.render_blender_toon_world(script, duration)
+    if not raw_video or not os.path.exists(raw_video):
+        print("[!] Blender 3D Toon render failed to produce raw video.")
+        return ""
+
     final_output = os.path.join(str(OUTPUT_DIR), f"history_short_{script_id}.mp4")
-    
-    # 4. Multi-track audio and video composite with FFmpeg
     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-    bgm_lute = os.path.abspath("assets/audio/bgm_renaissance_lute.wav")
-    sfx_bells = os.path.abspath("assets/audio/sfx_jester_bells.wav")
-    
-    # Subtitle filter formatting for Windows
     ass_path_unix = ass_path.replace("\\", "/").replace(":", "\\:")
-    
-    filter_complex = (
-        "[2:a]volume=0.14[bgm];"
-        "[3:a]adelay=600|600,volume=0.5[bells];"
-        "[1:a][bgm][bells]amix=inputs=3:duration=first[aout];"
-        f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles='{ass_path_unix}'[vout]"
-    )
-    
+
+    # 3. Upscale cleanly to 1080x1920, burn Whisper-synced captions, and mux mastered audio
+    vf_chain = f"scale=1080:1920:flags=lanczos,subtitles='{ass_path_unix}'"
+
     cmd = [
         ffmpeg_exe, "-y",
-        "-stream_loop", "-1", "-i", raw_video,
-        "-i", voice_path,
-        "-i", bgm_lute,
-        "-i", sfx_bells,
-        "-filter_complex", filter_complex,
-        "-map", "[vout]",
-        "-map", "[aout]",
-        "-t", str(round(duration + 0.3, 2)),
+        "-i", raw_video,
+        "-i", mix_wav,
+        "-vf", vf_chain,
+        "-map", "0:v:0",
+        "-map", "1:a:0",
+        "-t", str(round(duration + 0.1, 2)),
         "-c:v", "libx264",
         "-preset", "fast",
-        "-crf", "19",
+        "-crf", "17",
+        "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "192k",
         final_output
     ]
-    
-    print(f"[*] Compositing 2.5D animation + kinetic highlights -> {final_output}...")
+
+    print(f"[*] Muxing 3D Toon render + Kokoro/Whisper audio master -> {final_output}...")
     res = subprocess.run(cmd, capture_output=True, text=True)
-    if res.returncode == 0:
+    if res.returncode == 0 and os.path.exists(final_output):
         print(f"[+] Master short rendered successfully: {final_output} ({round(duration, 1)}s)")
         return final_output
     else:
-        print(f"[!] Composite error: {res.stderr[:200]}")
+        print(f"[!] Composite error: {res.stderr[-300:]}")
         return ""
 
