@@ -151,11 +151,17 @@ async function checkYouTubeStatus() {
     if (data.authenticated && data.channel) {
       if (elements.ytStatusDot) elements.ytStatusDot.className = 'status-dot online';
       if (elements.ytBannerDot) elements.ytBannerDot.className = 'status-dot online';
-      if (elements.ytStatusLabel) elements.ytStatusLabel.textContent = data.channel.title;
-      elements.ytBannerTitle.textContent = `Connected: ${data.channel.title}`;
-      elements.ytBannerDesc.textContent = `Channel active with ${Number(data.channel.subscribers).toLocaleString()} subscribers (${data.channel.videoCount} videos). Ready for direct uploads!`;
-      elements.btnAuthYtAction.textContent = 'Re-link Channel';
+      if (elements.ytStatusLabel) elements.ytStatusLabel.textContent = data.channel.title || 'Channel Connected';
+      elements.ytBannerTitle.textContent = `Connected: ${data.channel.title || 'YouTube Channel'}`;
+      const subCount = isNaN(Number(data.channel.subscribers)) ? 'Active' : Number(data.channel.subscribers).toLocaleString() + ' subscribers';
+      elements.ytBannerDesc.textContent = `Channel linked (${subCount}, ${data.channel.videoCount || 'Ready'} videos). Ready for direct uploads!`;
+      elements.btnAuthYtAction.textContent = 'Channel Connected ✓';
+      elements.btnAuthYtAction.className = 'btn btn-outline btn-sm';
+      elements.btnAuthYtAction.style.borderColor = 'var(--success)';
+      elements.btnAuthYtAction.style.color = 'var(--success)';
       if (elements.btnUploadSecretFile) elements.btnUploadSecretFile.style.display = 'none';
+      const codeBox = document.getElementById('manualCodeBox');
+      if (codeBox) codeBox.style.display = 'none';
     } else if (data.has_secret) {
       if (elements.ytStatusDot) {
         elements.ytStatusDot.className = 'status-dot';
@@ -217,39 +223,30 @@ if (elements.clientSecretFileInput) {
   });
 }
 
-// Direct Google OAuth URL for Desktop App
-const DIRECT_GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=620659263641-op74ptaouqu6omf6v5aq85hiljn5esb9.apps.googleusercontent.com&redirect_uri=http%3A%2F%2Flocalhost%3A54892%2F&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fyoutube.upload+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fyoutube.readonly&prompt=consent&access_type=offline";
-
 // Authorize Button Action
 if (elements.btnAuthYtAction) {
   elements.btnAuthYtAction.addEventListener('click', async () => {
-    elements.authStatusMsg.innerHTML = '<span style="color: #69f0ae;">Opening Google login in a new tab...</span>';
+    if (state.youtubeStatus.authenticated) {
+      const switchAcc = confirm(`Your channel "${state.youtubeStatus.channel ? state.youtubeStatus.channel.title : 'Time Riddles'}" is ALREADY CONNECTED and ready to publish!\n\nClick Cancel to keep this channel, or OK only if you want to switch to a different account.`);
+      if (!switchAcc) return;
+    }
+
+    elements.authStatusMsg.innerHTML = '<span style="color: #69f0ae;">Connecting to Google...</span>';
     
-    // Always open Google OAuth directly in a new tab
-    window.open(DIRECT_GOOGLE_AUTH_URL, '_blank');
-
-    // Also notify server to prepare listener if available
     try {
-      fetch('/api/youtube/auth', { method: 'POST' }).catch(() => {});
-    } catch (e) {}
-
-    // Show manual code paste fallback
-    const codeBox = document.getElementById('manualCodeBox');
-    if (codeBox) codeBox.style.display = 'block';
-
-    // Poll for token completion
-    let checks = 0;
-    const interval = setInterval(async () => {
-      checks++;
-      await checkYouTubeStatus();
-      if (state.youtubeStatus.authenticated || checks > 40) {
-        clearInterval(interval);
-        if (state.youtubeStatus.authenticated) {
-          elements.authStatusMsg.innerHTML = '<span style="color: #69f0ae; font-weight:700;">🎉 Channel Connected!</span>';
-          if (codeBox) codeBox.style.display = 'none';
-        }
+      const res = await fetch('/api/youtube/auth', { method: 'POST' });
+      const data = await res.json();
+      if (data.success && data.auth_url) {
+        // Navigate directly to Google login - Google will automatically redirect back to the studio
+        window.location.href = data.auth_url;
+      } else {
+        alert('Could not start authorization: ' + (data.error || 'Unknown error'));
+        elements.authStatusMsg.textContent = '';
       }
-    }, 2000);
+    } catch (e) {
+      alert('Error contacting studio server: ' + e.message);
+      elements.authStatusMsg.textContent = '';
+    }
   });
 }
 
@@ -720,11 +717,11 @@ async function loadPublishQueue() {
     const existing = state.queueItems.find(q => q.filename === v.filename);
     if (existing) return existing;
 
-    const defaultTitle = `${(v.title || v.filename).replace(/^⭐\s*/, '').replace(/\.mp4$/i, '')} #Shorts`;
-    const defaultDesc = `The shocking true story of ${(v.title || v.filename).replace(/^⭐\s*/, '').replace(/\.mp4$/i, '')}.\n\n` +
+    const defaultTitle = v.suggested_title || `${(v.title || v.filename).replace(/^⭐\s*/, '').replace(/\.mp4$/i, '')} #Shorts`;
+    const defaultDesc = v.suggested_desc || (`The shocking true story of ${(v.title || v.filename).replace(/^⭐\s*/, '').replace(/\.mp4$/i, '')}.\n\n` +
       `Key historical events & citations verified from primary academic archives.\n\n` +
       `🔔 Subscribe for daily obscure historical animations!\n\n` +
-      `#History #Shorts #HistoricalFacts #DidYouKnow #AncientHistory #UntoldStories`;
+      `#History #Shorts #HistoricalFacts #DidYouKnow #AncientHistory #UntoldStories`);
 
     return {
       filename: v.filename,
@@ -884,6 +881,13 @@ elements.btnDeselectAllQueue.addEventListener('click', () => {
 
 // Publish Selected Videos in Batch
 elements.btnPublishSelectedBatch.addEventListener('click', async () => {
+  if (!state.youtubeStatus.authenticated) {
+    alert('⚠️ YouTube Channel Not Linked!\n\nPlease click "Authorize Channel" above (or run run_youtube_auth.bat in your project folder) to connect your YouTube channel before uploading.');
+    const authBar = document.querySelector('.yt-channel-status-bar');
+    if (authBar) authBar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
   const selectedItems = state.queueItems.filter(i => i.selected);
   if (selectedItems.length === 0) {
     alert('Please select at least 1 video to publish.');
@@ -910,9 +914,9 @@ elements.btnPublishSelectedBatch.addEventListener('click', async () => {
         video_filename: item.filename,
         title: item.title,
         description: item.description,
-        tags: item.tags.split(',').map(t => t.trim()),
-        privacy: item.privacy,
-        schedule_delay_hours: item.scheduleDelay
+        tags: (item.tags || '').split(',').map(t => t.trim()).filter(Boolean),
+        privacy: item.privacy || 'public',
+        schedule_delay_hours: item.scheduleDelay || 0
       }))
     };
 
@@ -921,10 +925,22 @@ elements.btnPublishSelectedBatch.addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+
+    const resText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(resText);
+    } catch (parseErr) {
+      throw new Error(`Server returned HTTP ${res.status}: ${resText.slice(0, 150)}`);
+    }
+
+    if (!res.ok && (!data.results || data.results.length === 0)) {
+      throw new Error(data.error || `Upload failed with HTTP ${res.status}`);
+    }
 
     const results = data.results || [];
     const successList = results.filter(r => r.success);
+    const failedList = results.filter(r => !r.success);
 
     let linksHtml = successList.map(s => `
       <li style="margin-top: 6px;">
@@ -935,16 +951,30 @@ elements.btnPublishSelectedBatch.addEventListener('click', async () => {
       </li>
     `).join('');
 
+    let errorHtml = '';
+    if (failedList.length > 0) {
+      errorHtml = `
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 82, 82, 0.3); color: #ff8a80;">
+          <strong>⚠️ ${failedList.length} video(s) could not be uploaded:</strong>
+          <ul style="padding-left: 20px; margin-top: 6px;">
+            ${failedList.map(f => `<li><strong>${escapeHtml(f.video_filename)}:</strong> ${escapeHtml(f.error)}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+
     elements.batchUploadFeedback.innerHTML = `
-      <div style="background: rgba(0, 230, 118, 0.15); border: 1px solid var(--success); padding: 18px; border-radius: 8px; font-size: 13px; color: #a5d6a7;">
-        <h4 style="color: var(--success); font-size: 15px; margin-bottom: 8px;">🎉 Batch Publishing Complete! (${successList.length} of ${selectedItems.length} Uploaded)</h4>
-        <ul style="padding-left: 20px;">
-          ${linksHtml}
-        </ul>
+      <div style="background: ${successList.length > 0 ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 82, 82, 0.15)'}; border: 1px solid ${successList.length > 0 ? 'var(--success)' : 'var(--danger)'}; padding: 18px; border-radius: 8px; font-size: 13px; color: ${successList.length > 0 ? '#a5d6a7' : '#ff8a80'};">
+        <h4 style="color: ${successList.length > 0 ? 'var(--success)' : 'var(--danger)'}; font-size: 15px; margin-bottom: 8px;">
+          ${successList.length > 0 ? '🎉 Batch Publishing Complete!' : '⚠️ Batch Upload Issue'} (${successList.length} of ${selectedItems.length} Uploaded)
+        </h4>
+        ${successList.length > 0 ? `<ul style="padding-left: 20px;">${linksHtml}</ul>` : ''}
+        ${errorHtml}
       </div>
     `;
 
-    btn.textContent = 'Batch Upload Complete!';
+    btn.disabled = false;
+    btn.textContent = successList.length > 0 ? 'Batch Upload Complete!' : 'Retry Upload';
   } catch (err) {
     elements.batchUploadFeedback.innerHTML = `
       <div style="background: rgba(255, 82, 82, 0.15); border: 1px solid var(--danger); padding: 14px; border-radius: 8px; font-size: 13px; color: #ff8a80;">
@@ -969,6 +999,18 @@ function escapeHtml(str) {
 
 // Initialize on Load
 document.addEventListener('DOMContentLoaded', () => {
+  // Check for OAuth redirect return from Google
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('auth') === 'success') {
+    switchTab('tab-upload');
+    elements.authStatusMsg.innerHTML = '<span style="color: #69f0ae; font-weight:700;">🎉 Channel Connected Successfully!</span>';
+    window.history.replaceState({}, document.title, window.location.pathname + '#tab-upload');
+  } else if (urlParams.get('auth') === 'error') {
+    switchTab('tab-upload');
+    alert('⚠️ YouTube authorization was not completed. Please try again.');
+    window.history.replaceState({}, document.title, window.location.pathname + '#tab-upload');
+  }
+
   checkYouTubeStatus();
   searchTopics(); // Initial population of curated topics
   loadVideos();

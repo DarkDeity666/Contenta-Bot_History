@@ -9,7 +9,7 @@ import json
 import asyncio
 from pathlib import Path
 from aiohttp import web
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from config import BASE_DIR, OUTPUT_DIR, YOUTUBE_CLIENT_SECRET_FILE, STUDIO_PORT
 import enhanced_scraper
@@ -53,18 +53,72 @@ def save_cached_scripts():
 
 load_cached_scripts()
 
+# Active OAuth flows map for preserving PKCE verifiers
+active_oauth_flows: Dict[str, Any] = {}
+
+def get_redirect_uri(request) -> str:
+    host = request.host
+    return f"http://{host}/"
+
+async def process_oauth_code(code: str, redirect_uri: str) -> bool:
+    global active_oauth_flows
+    flow = active_oauth_flows.get(redirect_uri)
+    if flow:
+        try:
+            flow.fetch_token(code=code)
+            creds = flow.credentials
+            if creds and creds.valid:
+                with open(youtube_uploader.TOKEN_FILE, "w", encoding="utf-8") as token:
+                    token.write(creds.to_json())
+                print("[+] YouTube token saved successfully from active flow!")
+                return True
+        except Exception as e:
+            print(f"[!] Active flow token fetch failed: {e}")
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, 
+        lambda: youtube_uploader.exchange_code_for_token(code, redirect_uri=redirect_uri)
+    )
+
 # ---------------------------------------------------------------------------
 # Route Handlers
 # ---------------------------------------------------------------------------
 
 async def handle_index(request):
-    return web.FileResponse(WEB_DIR / "index.html")
+    code = request.query.get("code")
+    if code:
+        redirect_uri = get_redirect_uri(request)
+        ok = await process_oauth_code(code, redirect_uri)
+        if ok:
+            raise web.HTTPFound("/?auth=success#tab-upload")
+        else:
+            raise web.HTTPFound("/?auth=error#tab-upload")
+
+    resp = web.FileResponse(WEB_DIR / "index.html")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
+async def handle_oauth_callback(request):
+    code = request.query.get("code")
+    if code:
+        redirect_uri = f"http://{request.host}/oauth2callback"
+        ok = await process_oauth_code(code, redirect_uri)
+        if ok:
+            raise web.HTTPFound("/?auth=success#tab-upload")
+        else:
+            raise web.HTTPFound("/?auth=error#tab-upload")
+    raise web.HTTPFound("/?auth=error#tab-upload")
 
 async def handle_styles(request):
-    return web.FileResponse(WEB_DIR / "styles.css")
+    resp = web.FileResponse(WEB_DIR / "styles.css")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
 
 async def handle_app_js(request):
-    return web.FileResponse(WEB_DIR / "app.js")
+    resp = web.FileResponse(WEB_DIR / "app.js")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
 
 async def handle_media(request):
     filename = request.match_info.get("filename")
@@ -117,6 +171,9 @@ async def api_generate_scripts(request):
             sentences = [s.strip() for s in facts.replace("\n", " ").split(". ") if len(s.strip()) > 15]
             escalation_text = ". ".join(sentences[1:3]) if len(sentences) >= 3 else facts[:240]
             
+            clean_title_str = title[:82].rsplit(' ', 1)[0] if len(title) > 85 else title
+            suggested_short_title = f"{clean_title_str} #Shorts"
+            
             script_obj = {
                 "id": topic["id"],
                 "title": title,
@@ -130,7 +187,7 @@ async def api_generate_scripts(request):
                 "est_duration": "1:35",
                 "word_count": 140,
                 "citations": source,
-                "suggested_title": f"{title[:45]} #Shorts",
+                "suggested_title": suggested_short_title,
                 "suggested_desc": f"The incredible true historical record of {title}.\n\n"
                                   f"📚 Historical Citations: {source}\n\n"
                                   f"🔔 Subscribe for daily animated history anomalies!\n\n"
@@ -157,6 +214,13 @@ def find_matching_script(filename: str) -> Optional[Dict[str, Any]]:
             return s
     if "triboulet" in fn:
         return next((s for s in cached_scripts if "triboulet" in s.get("id", "").lower()), None)
+    # Check if numbered like history_short_6.mp4 or short_2.mp4
+    import re
+    m = re.search(r'_(\d+)(?:\.|$)', fn)
+    if m:
+        idx = int(m.group(1)) - 1
+        if 0 <= idx < len(cached_scripts):
+            return cached_scripts[idx]
     return None
 
 # --- Video Vault APIs ---
@@ -173,7 +237,14 @@ async def api_get_videos(request):
             
             if matched_script:
                 story_title = matched_script.get("title", clean_title)
-                suggested_title = matched_script.get("suggested_title") or f"{story_title[:45]} #Shorts"
+                raw_title = matched_script.get("suggested_title") or story_title
+                if not raw_title.endswith("#Shorts"):
+                    if len(raw_title) > 85:
+                        raw_title = raw_title[:82].rsplit(' ', 1)[0] + "..."
+                    suggested_title = f"{raw_title} #Shorts"
+                else:
+                    suggested_title = raw_title
+
                 suggested_desc = matched_script.get("suggested_desc") or (
                     f"{matched_script.get('hook', '')}\n\n"
                     f"{matched_script.get('escalation', '')}\n\n"
@@ -214,24 +285,30 @@ async def api_youtube_status(request):
     channel_info = None
     is_authenticated = False
     if has_token:
-        # Check channel info in executor
+        try:
+            from google.oauth2.credentials import Credentials
+            creds = Credentials.from_authorized_user_file(str(token_path))
+            if creds and (creds.valid or creds.refresh_token):
+                is_authenticated = True
+                channel_info = {
+                    "title": "Time Riddles (@timeriddlesyt)",
+                    "subscribers": "0",
+                    "videoCount": "0"
+                }
+        except Exception:
+            pass
+
+        # Optionally enrich with full channel stats if network/scopes allow
         loop = asyncio.get_event_loop()
-        channel_info = await loop.run_in_executor(None, youtube_uploader.get_channel_details)
-        if channel_info:
-            is_authenticated = True
-        else:
-            try:
-                from google.oauth2.credentials import Credentials
-                creds = Credentials.from_authorized_user_file(str(token_path))
-                if creds and (creds.valid or creds.refresh_token):
-                    is_authenticated = True
-                    channel_info = {
-                        "title": "Connected YouTube Channel",
-                        "subscribers": "Ready",
-                        "videoCount": "Ready"
-                    }
-            except Exception:
-                pass
+        try:
+            detailed = await asyncio.wait_for(
+                loop.run_in_executor(None, youtube_uploader.get_channel_details),
+                timeout=2.0
+            )
+            if detailed:
+                channel_info = detailed
+        except Exception:
+            pass
         
     return web.json_response({
         "has_secret": has_secret,
@@ -258,13 +335,19 @@ async def api_youtube_auth(request):
         }, status=400)
         
     try:
-        auth_url = youtube_uploader.get_auth_url()
-        loop = asyncio.get_event_loop()
-        # Start background listener in case localhost redirect catches it
-        asyncio.create_task(loop.run_in_executor(None, lambda: youtube_uploader.get_authenticated_service(interactive=True)))
+        from google_auth_oauthlib.flow import InstalledAppFlow
+        redirect_uri = get_redirect_uri(request)
+        flow = InstalledAppFlow.from_client_secrets_file(
+            YOUTUBE_CLIENT_SECRET_FILE,
+            youtube_uploader.SCOPES,
+            redirect_uri=redirect_uri
+        )
+        auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
+        active_oauth_flows[redirect_uri] = flow
         return web.json_response({
             "success": True, 
             "auth_url": auth_url,
+            "redirect_uri": redirect_uri,
             "message": "Google authentication link generated."
         })
     except Exception as e:
@@ -284,51 +367,58 @@ async def api_youtube_exchange_code(request):
         return web.json_response({"success": False, "error": "Code exchange failed"}, status=400)
 
 async def api_upload_execute(request):
-    data = await request.json()
-    video_filename = data.get("video_filename")
-    title = data.get("title", "")
-    description = data.get("description", "")
-    tags = data.get("tags", [])
-    privacy = data.get("privacy", "public")
-    delay_hours = data.get("schedule_delay_hours", 0)
+    try:
+        data = await request.json()
+        video_filename = data.get("video_filename", "")
+        title = data.get("title", "")
+        description = data.get("description", "")
+        tags = data.get("tags", [])
+        privacy = data.get("privacy", "public")
+        delay_hours = data.get("schedule_delay_hours", 0)
 
-    video_path = OUTPUT_DIR / video_filename
-    if not video_path.exists():
-        return web.json_response({"success": False, "error": "Video file not found"}, status=404)
+        video_path = OUTPUT_DIR / video_filename
+        if not video_filename or not video_path.exists():
+            return web.json_response({"success": False, "error": f"Video file not found: {video_filename}"}, status=404)
 
-    loop = asyncio.get_event_loop()
-    upload_res = await loop.run_in_executor(
-        None,
-        lambda: youtube_uploader.upload_short_to_youtube(
-            video_path=str(video_path),
-            title=title,
-            description=description,
-            tags=tags,
-            schedule_delay_hours=delay_hours,
-            privacy_status=privacy
+        loop = asyncio.get_event_loop()
+        res_dict = await loop.run_in_executor(
+            None,
+            lambda: youtube_uploader.upload_short_to_youtube(
+                video_path=str(video_path),
+                title=title,
+                description=description,
+                tags=tags,
+                schedule_delay_hours=delay_hours,
+                privacy_status=privacy
+            )
         )
-    )
-
-    if upload_res:
-        return web.json_response({
-            "success": True,
-            "video_id": upload_res,
-            "video_url": f"https://youtube.com/shorts/{upload_res}"
-        })
-    else:
-        return web.json_response({
-            "success": False,
-            "error": "Upload failed. Check YouTube authorization status."
-        }, status=500)
+        if res_dict.get("success"):
+            vid = res_dict.get("video_id")
+            return web.json_response({
+                "success": True,
+                "video_id": vid,
+                "video_url": res_dict.get("url") or f"https://youtube.com/shorts/{vid}"
+            })
+        else:
+            return web.json_response({
+                "success": False,
+                "error": res_dict.get("error", "Upload failed")
+            }, status=400)
+    except Exception as e:
+        return web.json_response({"success": False, "error": str(e)}, status=500)
 
 async def api_upload_batch(request):
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception as e:
+        return web.json_response({"success": False, "error": f"Invalid JSON payload: {e}", "results": []}, status=400)
+
     items = data.get("items", [])
     results = []
     loop = asyncio.get_event_loop()
     
     for item in items:
-        video_filename = item.get("video_filename")
+        video_filename = item.get("video_filename", "")
         title = item.get("title", "")
         description = item.get("description", "")
         tags = item.get("tags", [])
@@ -336,42 +426,50 @@ async def api_upload_batch(request):
         delay_hours = item.get("schedule_delay_hours", 0)
 
         video_path = OUTPUT_DIR / video_filename
-        if not video_path.exists():
+        if not video_filename or not video_path.exists():
             results.append({
                 "video_filename": video_filename,
                 "success": False,
-                "error": "Video file not found"
+                "error": f"Video file not found: {video_filename}"
             })
             continue
 
-        upload_res = await loop.run_in_executor(
-            None,
-            lambda v_path=str(video_path), t=title, d=description, tg=tags, h=delay_hours, p=privacy: (
-                youtube_uploader.upload_short_to_youtube(
-                    video_path=v_path,
-                    title=t,
-                    description=d,
-                    tags=tg,
-                    schedule_delay_hours=h,
-                    privacy_status=p
+        try:
+            res_dict = await loop.run_in_executor(
+                None,
+                lambda v_path=str(video_path), t=title, d=description, tg=tags, h=delay_hours, p=privacy: (
+                    youtube_uploader.upload_short_to_youtube(
+                        video_path=v_path,
+                        title=t,
+                        description=d,
+                        tags=tg,
+                        schedule_delay_hours=h,
+                        privacy_status=p
+                    )
                 )
             )
-        )
-        if upload_res:
-            results.append({
-                "video_filename": video_filename,
-                "success": True,
-                "video_id": upload_res,
-                "video_url": f"https://youtube.com/shorts/{upload_res}"
-            })
-        else:
+            if res_dict.get("success"):
+                vid = res_dict.get("video_id")
+                results.append({
+                    "video_filename": video_filename,
+                    "success": True,
+                    "video_id": vid,
+                    "video_url": res_dict.get("url") or f"https://youtube.com/shorts/{vid}"
+                })
+            else:
+                results.append({
+                    "video_filename": video_filename,
+                    "success": False,
+                    "error": res_dict.get("error", "Failed during upload")
+                })
+        except Exception as e:
             results.append({
                 "video_filename": video_filename,
                 "success": False,
-                "error": "Failed during upload"
+                "error": str(e)
             })
             
-    return web.json_response({"results": results})
+    return web.json_response({"success": True, "results": results})
 
 async def api_render_generate(request):
     data = await request.json()
@@ -385,6 +483,7 @@ async def api_render_generate(request):
 def create_app():
     app = web.Application()
     app.router.add_get("/", handle_index)
+    app.router.add_get("/oauth2callback", handle_oauth_callback)
     app.router.add_get("/styles.css", handle_styles)
     app.router.add_get("/app.js", handle_app_js)
     app.router.add_get("/media/{filename}", handle_media)
