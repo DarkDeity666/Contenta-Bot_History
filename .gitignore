@@ -1,6 +1,4 @@
-# ========================================================
-# ANTIGRAVITY HISTORY BOT - GITIGNORE (ZERO-LEAK SECURITY)
-# ========================================================
+
 
 # --- 1. SENSITIVE CREDENTIALS & API KEYS (CRITICAL: DO NOT COMMIT) ---
 .env
